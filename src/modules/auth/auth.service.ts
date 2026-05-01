@@ -1,0 +1,226 @@
+import {
+  ConflictException,
+  Injectable,
+  InternalServerErrorException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+import { RegisterDTO } from './dto/register.dto';
+import { LoginResponseDto, RegisterResponseDto } from './dto/auth-response.dto';
+import * as bcrypt from 'bcrypt';
+import { LoginDto } from './dto/login.dto';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
+
+@Injectable()
+export class AuthService {
+  private readonly SALT_ROUNDS = 10;
+  constructor(
+    private prisma: PrismaService,
+    private jwtService: JwtService,
+    private configService: ConfigService,
+  ) {}
+
+  // register
+  async register(registerDto: RegisterDTO): Promise<RegisterResponseDto> {
+    const { email, password, firstName, lastName } = registerDto;
+    const exitingUser = await this.prisma.account.findUnique({
+      where: { email },
+    });
+
+    if (exitingUser) {
+      throw new ConflictException('User with this email already exitis');
+    }
+
+    const customerRole = await this.prisma.role.findUnique({
+      where: { name: 'customer' },
+    });
+
+    if (!customerRole) {
+      throw new InternalServerErrorException('Role customer not exitis');
+    }
+
+    try {
+      const result = await this.prisma.$transaction(async (tx) => {
+        const hashPassword = await bcrypt.hash(password, this.SALT_ROUNDS);
+        const account = await tx.account.create({
+          data: {
+            email,
+            hash_password: hashPassword,
+            role_account: {
+              create: {
+                role_id: customerRole.id,
+              },
+            },
+          },
+          select: {
+            id: true,
+            email: true,
+          },
+        });
+
+        const customer = await tx.customer.create({
+          data: {
+            account_id: account.id,
+            first_name: firstName,
+            last_name: lastName,
+            email: account.email,
+          },
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            email: true,
+          },
+        });
+        return customer;
+      });
+
+      return {
+        user: result,
+      };
+    } catch (error) {
+      console.error('Error during user registration:', error);
+      throw new InternalServerErrorException(
+        'An error occurred during registration',
+      );
+    }
+  }
+
+  //login
+  async login(loginDto: LoginDto): Promise<LoginResponseDto> {
+    const { email, password } = loginDto;
+    const account = await this.prisma.account.findUnique({
+      where: { email },
+      include: {
+        role_account: {
+          include: { role: true },
+        },
+      },
+    });
+
+    if (!account || !(await bcrypt.compare(password, account.hash_password))) {
+      throw new UnauthorizedException('Invalid email or password');
+    }
+
+    if (!account.is_active) {
+      throw new UnauthorizedException('Account has been blocked');
+    }
+
+    const roles = account.role_account.map((ra) => ra.role.name);
+
+    const tokens = await this.generateTokens(account.id, roles);
+    await this.saveRefreshToken(account.id, tokens.refreshToken);
+
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    };
+  }
+
+  // Generate token
+  private async generateTokens(
+    accountId: string,
+    roles: string[],
+  ): Promise<{ accessToken: string; refreshToken: string }> {
+    const payload = { sub: accountId, roles };
+    const [accessToken, refreshToken] = await Promise.all([
+      this.jwtService.signAsync(payload, {
+        expiresIn: '15m',
+        secret: this.configService.get<string>('JWT_SECRET'),
+      }),
+      this.jwtService.signAsync(payload, {
+        expiresIn: '7d',
+        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+      }),
+    ]);
+    return { accessToken, refreshToken };
+  }
+
+  // Save refreshToken
+  private async saveRefreshToken(
+    accountId: string,
+    refreshToken: string,
+  ): Promise<void> {
+    await this.prisma.refreshToken.create({
+      data: {
+        token: refreshToken,
+        account_id: accountId,
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      },
+    });
+  }
+
+  // RefreshToken
+  async refreshToken(refreshToken: string): Promise<{ accessToken: string }> {
+    // 1. Verify refresh token
+    let payload: { sub: string; roles: string[] };
+    try {
+      payload = await this.jwtService.verifyAsync(refreshToken, {
+        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+      });
+    } catch {
+      throw new UnauthorizedException('Refresh token is invalidate or expired');
+    }
+
+    // 2. Check token trong DB
+    const tokenRecord = await this.prisma.refreshToken.findUnique({
+      where: { token: refreshToken },
+    });
+
+    if (!tokenRecord) {
+      throw new UnauthorizedException('Refresh token not exists');
+    }
+
+    if (tokenRecord.is_revoked) {
+      throw new UnauthorizedException('Refresh token was revoked');
+    }
+
+    if (tokenRecord.expires_at < new Date()) {
+      throw new UnauthorizedException('Refresh token is expired');
+    }
+
+    // 3. Check account còn active không
+    const account = await this.prisma.account.findUnique({
+      where: { id: payload.sub },
+      include: {
+        role_account: {
+          include: { role: true },
+        },
+      },
+    });
+
+    if (!account || !account.is_active) {
+      throw new UnauthorizedException('Account does not exist or is locked');
+    }
+
+    // 4. Gen access token mới
+    const roles = account.role_account.map((ra) => ra.role.name);
+    const newAccessToken = await this.jwtService.signAsync(
+      { sub: account.id, roles },
+      {
+        expiresIn: '15m',
+        secret: this.configService.get<string>('JWT_SECRET'),
+      },
+    );
+
+    return { accessToken: newAccessToken };
+  }
+
+  // Logout
+  // Client gọi POST /auth/logout
+  // → Gửi kèm accessToken (header) + refreshToken (cookie)
+  // → Server revoke refreshToken trong DB
+  // → Server xóa cookie
+  // → Client xóa accessToken khỏi memory
+  async logout(accountId: string, refreshToken: string): Promise<void> {
+    await this.prisma.refreshToken.updateMany({
+      where: {
+        token: refreshToken,
+        account_id: accountId,
+        is_revoked: false,
+      },
+      data: { is_revoked: true },
+    });
+  }
+}

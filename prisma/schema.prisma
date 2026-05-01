@@ -1,0 +1,311 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+  // provider = "prisma-client"
+  // output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ===== ENUMS =====
+
+enum RoomStatus {
+  available
+  occupied
+  maintenance
+  cleaning
+}
+
+enum BookingStatus {
+  pending
+  confirmed
+  checked_in
+  checked_out
+  cancelled
+}
+
+enum BookingType {
+  online
+  walk_in
+}
+
+enum InvoiceStatus {
+  unpaid
+  paid
+  partially_paid
+}
+
+// ===== MODELS =====
+
+model Account {
+  id            String   @id @default(uuid()) @db.Uuid
+  email         String   @unique @db.VarChar
+  hash_password String
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now())
+
+  customer            Customer?
+  employee            Employee?
+  role_account        RoleAccount[]
+  refreshTokens       RefreshToken[]
+  roomStatusHistories RoomStatusHistory[]
+}
+
+model RefreshToken {
+  id         String   @id @default(uuid())
+  token      String   @unique
+  account_id String   @db.Uuid
+  created_at DateTime @default(now())
+  expires_at DateTime
+  is_revoked Boolean  @default(false)
+
+  account Account @relation(fields: [account_id], references: [id])
+}
+
+model Customer {
+  id                   String  @id @default(uuid()) @db.Uuid
+  account_id           String  @unique @db.Uuid
+  first_name           String  @db.VarChar
+  last_name            String  @db.VarChar
+  email                String  @db.VarChar
+  phone                String? @db.VarChar
+  id_card_img_url      String?
+  id_card_img_back_url String?
+  nationality          String? @db.VarChar
+  reward_points        Int     @default(0)
+
+  account  Account   @relation(fields: [account_id], references: [id])
+  bookings Booking[]
+}
+
+model Employee {
+  id         String   @id @default(uuid()) @db.Uuid
+  account_id String   @unique @db.Uuid
+  first_name String   @db.VarChar
+  last_name  String   @db.VarChar
+  email      String?  @db.VarChar
+  phone      String   @db.VarChar
+  salary     Decimal  @default(0)
+  hired_date DateTime @db.Date
+  position   String   @db.VarChar
+  gender     String   @db.VarChar
+
+  account               Account             @relation(fields: [account_id], references: [id])
+  bookings              Booking[]
+  employee_shifts       EmployeeShift[]
+  room_status_histories RoomStatusHistory[]
+  guests                Guest[]
+}
+
+model EmployeeShift {
+  id          String   @id @default(uuid()) @db.Uuid
+  employee_id String   @db.Uuid
+  shift_id    String   @db.Uuid
+  work_date   DateTime @db.Date
+
+  employee Employee @relation(fields: [employee_id], references: [id])
+  shift    Shift    @relation(fields: [shift_id], references: [id])
+
+  @@index([employee_id, work_date]) // xem lịch làm việc nhân viên
+}
+
+model Shift {
+  id         String   @id @default(uuid()) @db.Uuid
+  name       String   @db.VarChar
+  start_time DateTime @db.Time
+  end_time   DateTime @db.Time
+
+  employee_shifts EmployeeShift[]
+}
+
+model Booking {
+  id               String        @id @default(uuid()) @db.Uuid
+  customer_id      String?       @db.Uuid
+  created_by       String?       @db.Uuid
+  booking_type     BookingType
+  check_in_date    DateTime      @db.Date
+  check_out_date   DateTime      @db.Date
+  actual_check_in  DateTime?
+  actual_check_out DateTime?
+  status           BookingStatus @default(pending)
+  guest_id         String?       @db.Uuid
+  created_at       DateTime      @default(now())
+  updated_at       DateTime      @updatedAt
+
+  customer         Customer?        @relation(fields: [customer_id], references: [id])
+  employee         Employee?        @relation(fields: [created_by], references: [id])
+  guest            Guest?           @relation(fields: [guest_id], references: [id])
+  invoices         Invoice[]
+  booking_services BookingService[]
+  booking_rooms    BookingRoom[]
+
+  @@index([customer_id]) // tìm booking của customer
+  @@index([status]) // filter booking theo trạng thái
+  @@index([check_in_date, check_out_date]) // query phòng trống theo ngày — quan trọng nhất
+}
+
+model Invoice {
+  id           String        @id @default(uuid()) @db.Uuid
+  booking_id   String        @unique @db.Uuid
+  total_amount Decimal
+  discount     Decimal       @default(0)
+  final_amount Decimal
+  status       InvoiceStatus @default(unpaid)
+  created_at   DateTime      @default(now())
+  updated_at   DateTime      @updatedAt
+
+  booking  Booking   @relation(fields: [booking_id], references: [id])
+  payments Payment[]
+
+  @@index([booking_id]) // lấy danh sách phòng của booking
+}
+
+model Payment {
+  id               String   @id @default(uuid()) @db.Uuid
+  invoice_id       String   @db.Uuid
+  amount           Decimal
+  paid_at          DateTime @default(now())
+  reference_number String?  @db.VarChar // nullable — tiền mặt không có mã GD
+  payment_method   String   @db.VarChar
+  created_at       DateTime @default(now())
+
+  invoice Invoice @relation(fields: [invoice_id], references: [id])
+
+  @@index([invoice_id]) // lấy thanh toán của invoice
+}
+
+model Service {
+  id        String  @id @default(uuid()) @db.Uuid
+  name      String  @db.VarChar
+  price     Decimal
+  is_active Boolean @default(true)
+
+  booking_services BookingService[]
+}
+
+model BookingService {
+  id          String  @id @default(uuid()) @db.Uuid
+  service_id  String  @db.Uuid
+  booking_id  String  @db.Uuid
+  quantity    Int
+  unit_price  Decimal
+  total_price Decimal // non-nullable — luôn = quantity * unit_price
+
+  service Service @relation(fields: [service_id], references: [id])
+  booking Booking @relation(fields: [booking_id], references: [id])
+
+  @@index([booking_id]) // lấy dịch vụ của booking
+}
+
+model BookingRoom {
+  id              String  @id @default(uuid()) @db.Uuid
+  booking_id      String  @db.Uuid
+  room_id         String  @db.Uuid
+  price_per_night Decimal
+
+  booking Booking @relation(fields: [booking_id], references: [id])
+  room    Room    @relation(fields: [room_id], references: [id])
+
+  @@index([room_id])
+  @@index([booking_id])
+}
+
+model Room {
+  id           String     @id @default(uuid()) @db.Uuid
+  room_number  String     @unique @db.VarChar // unique
+  room_type_id String     @db.Uuid
+  floor        Int
+  status       RoomStatus @default(available)
+  updated_at   DateTime   @updatedAt
+  created_at   DateTime   @default(now())
+
+  room_type             RoomType            @relation(fields: [room_type_id], references: [id])
+  booking_rooms         BookingRoom[]
+  room_status_histories RoomStatusHistory[]
+
+  @@index([status]) // filter phòng available
+  @@index([room_type_id]) // filter phòng theo loại
+}
+
+model RoomType {
+  id         String  @id @default(uuid()) @db.Uuid
+  name       String  @db.VarChar
+  base_price Decimal
+  capacity   Int
+  amenities  Json    @default("[]")
+
+  rooms Room[]
+}
+
+model RoomStatusHistory {
+  id         String      @id @default(uuid()) @db.Uuid
+  room_id    String      @db.Uuid
+  old_status RoomStatus
+  new_status RoomStatus?
+  changed_at DateTime    @default(now())
+  changed_by String?     @db.Uuid
+
+  room    Room     @relation(fields: [room_id], references: [id])
+  account Account? @relation(fields: [changed_by], references: [id])
+
+  // employee Employee? @relation(fields: [changed_by], references: [id])
+  employee   Employee? @relation(fields: [employeeId], references: [id])
+  employeeId String?   @db.Uuid
+
+  @@index([room_id]) // lấy lịch sử của phòng
+}
+
+model Permission {
+  id   String @id @default(uuid()) @db.Uuid
+  name String @unique @db.VarChar
+
+  role_permissions RolePermission[]
+}
+
+model RolePermission {
+  id            String @id @default(uuid()) @db.Uuid
+  role_id       String @db.Uuid
+  permission_id String @db.Uuid
+
+  role       Role       @relation(fields: [role_id], references: [id])
+  permission Permission @relation(fields: [permission_id], references: [id])
+}
+
+model RoleAccount {
+  account_id String @db.Uuid
+  role_id    String @db.Uuid
+
+  account Account @relation(fields: [account_id], references: [id])
+  role    Role    @relation(fields: [role_id], references: [id])
+
+  @@id([account_id, role_id])
+}
+
+model Role {
+  id   String @id @default(uuid()) @db.Uuid
+  name String @unique @db.VarChar
+
+  role_accounts    RoleAccount[]
+  role_permissions RolePermission[]
+}
+
+model Guest {
+  id                   String   @id @default(uuid()) @db.Uuid
+  fullname             String   @db.VarChar
+  phone                String   @db.VarChar
+  email                String?  @db.VarChar // nullable
+  id_card_img_url      String
+  id_card_img_back_url String
+  create_by_staff_id   String?  @db.Uuid
+  created_at           DateTime @default(now())
+  nationality          String?  @db.VarChar
+
+  employee Employee? @relation(fields: [create_by_staff_id], references: [id])
+  bookings Booking[]
+}
