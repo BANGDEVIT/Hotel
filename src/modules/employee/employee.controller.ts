@@ -129,6 +129,25 @@ export class EmployeeController {
     return this.employeeService.update(id, updateEmployeeDto);
   }
 
+  @Patch(':id/reset-password')
+  @HttpCode(200)
+  @Roles('manager', 'admin')
+  @ApiOperation({
+    summary: 'Reset mật khẩu nhân viên',
+    description: 'Reset về mật khẩu mặc định — nhân viên tự đổi sau khi login',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID của nhân viên',
+    example: 'uuid-123',
+  })
+  @ApiResponse({ status: 200, description: 'Reset mật khẩu thành công' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy nhân viên' })
+  async resetPassword(@Param('id') id: string) {
+    await this.employeeService.resetPassword(id);
+    return { message: 'Reset mật khẩu thành công' };
+  }
+
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.employeeService.remove(+id);

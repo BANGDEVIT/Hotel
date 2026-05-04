@@ -9,10 +9,14 @@ import { UpdateEmployeeDto } from './dto/update-employee.dto';
 import { QueryEmployeeDTO } from './dto/query-employee.dto';
 import { PaginatedEmployeeResponseDto } from './dto/employee-response';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class EmployeeService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
+  ) {}
   async findAll(
     query: QueryEmployeeDTO,
   ): Promise<PaginatedEmployeeResponseDto> {
@@ -280,6 +284,27 @@ export class EmployeeService {
       ...rest,
       full_name: `${ln} ${fn}`,
     };
+  }
+
+  async resetPassword(id: string): Promise<void> {
+    const existingEmployee = await this.prisma.employee.findUnique({
+      where: { id },
+      include: { account: true },
+    });
+
+    if (!existingEmployee) {
+      throw new NotFoundException('Employee does not Exist');
+    }
+
+    const hashPassword = await bcrypt.hash(
+      this.configService.get<string>('RESET_PASSWORD'),
+      10,
+    );
+
+    await this.prisma.account.update({
+      where: { id: existingEmployee.account.id },
+      data: { hash_password: hashPassword },
+    });
   }
 
   remove(id: number) {
