@@ -10,4 +10,9 @@ export class RegisterResponseDto {
 export class LoginResponseDto {
   accessToken: string;
   refreshToken: string;
+  account: {
+    id: string;
+    email: string;
+    roles: string[];
+  };
 }
