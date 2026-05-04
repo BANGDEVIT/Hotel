@@ -34,7 +34,7 @@ export class EmployeeController {
 
   @Get()
   @HttpCode(200)
-  @Roles('manager')
+  @Roles('admin', 'manager')
   @ApiOperation({
     summary: 'Lấy danh sách nhân viên',
     description: 'Hỗ trợ filter theo tên, vị trí và phân trang',
@@ -54,7 +54,7 @@ export class EmployeeController {
 
   @Get(':id')
   @HttpCode(200)
-  @Roles('manager')
+  @Roles('admin', 'manager')
   @ApiOperation({
     summary: 'Lấy thông tin nhân viên theo ID',
     description: 'Chỉ manager mới xem được thông tin chi tiết của nhân viên',
@@ -78,7 +78,7 @@ export class EmployeeController {
 
   @Post()
   @HttpCode(201)
-  @Roles('manager')
+  @Roles('admin', 'manager')
   @ApiOperation({
     summary: 'Tạo nhân viên mới',
     description:
@@ -98,11 +98,35 @@ export class EmployeeController {
   }
 
   @Patch(':id')
+  @HttpCode(200)
+  @Roles('manager', 'admin')
+  @ApiOperation({
+    summary: 'Cập nhật thông tin nhân viên',
+    description: 'Chi manager mới có quyền cập nhật.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID của nhân viên',
+    example: 'uuid-123',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Câp nhật thành công',
+    type: UpdateEmployeeDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Dữ liệu không hơp lệ',
+  })
+  @ApiResponse({ status: 401, description: 'Chưa đăng nhập' })
+  @ApiResponse({ status: 403, description: 'Không có quyền câp nhật' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy nhân viên' })
+  @ApiResponse({ status: 409, description: 'Email đã tồn tại' })
   update(
     @Param('id') id: string,
     @Body() updateEmployeeDto: UpdateEmployeeDto,
   ) {
-    return this.employeeService.update(+id, updateEmployeeDto);
+    return this.employeeService.update(id, updateEmployeeDto);
   }
 
   @Delete(':id')

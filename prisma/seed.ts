@@ -10,7 +10,12 @@ const prisma = new PrismaClient({ adapter });
 
 async function main() {
   await prisma.role.createMany({
-    data: [{ name: 'customer' }, { name: 'staff' }, { name: 'manager' }],
+    data: [
+      { name: 'admin' },
+      { name: 'customer' },
+      { name: 'staff' },
+      { name: 'manager' },
+    ],
     skipDuplicates: true,
   });
 

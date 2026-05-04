@@ -204,8 +204,82 @@ export class EmployeeService {
     };
   }
 
-  update(id: number, updateEmployeeDto: UpdateEmployeeDto) {
-    return `This action updates a #${id} employee`;
+  async update(id: string, updateEmployeeDto: UpdateEmployeeDto) {
+    const existingEmployee = await this.prisma.employee.findUnique({
+      where: { id },
+      include: { account: true },
+    });
+
+    if (!existingEmployee) {
+      throw new NotFoundException('Employee does not exist');
+    }
+
+    const {
+      email,
+      first_name,
+      last_name,
+      phone,
+      position,
+      salary,
+      hired_date,
+      gender,
+      is_active,
+    } = updateEmployeeDto;
+
+    if (email && email !== existingEmployee.account.email) {
+      const existingEmail = await this.prisma.account.findUnique({
+        where: { email },
+      });
+
+      if (existingEmail) {
+        throw new ConflictException('Email has been already exist');
+      }
+    }
+
+    const employee = await this.prisma.$transaction(async (tx) => {
+      const accountData: any = {};
+      if (email) accountData.email = email;
+      if (is_active !== undefined) accountData.is_active = is_active;
+
+      if (Object.keys(accountData).length > 0) {
+        await tx.account.update({
+          where: { id: existingEmployee.account.id },
+          data: accountData,
+        });
+      }
+
+      return await tx.employee.update({
+        where: { id: id },
+        data: {
+          ...(first_name && { first_name }),
+          ...(last_name && { last_name }),
+          ...(phone && { phone }),
+          ...(position && { position }),
+          ...(salary !== undefined && { salary }),
+          ...(hired_date && { hired_date: new Date(hired_date) }),
+          ...(gender && { gender }),
+        },
+        select: {
+          id: true,
+          first_name: true,
+          last_name: true,
+          email: true,
+          phone: true,
+          position: true,
+          salary: true,
+          hired_date: true,
+          gender: true,
+          account: { select: { id: true, email: true, is_active: true } },
+        },
+      });
+    });
+
+    const { first_name: fn, last_name: ln, ...rest } = employee;
+
+    return {
+      ...rest,
+      full_name: `${ln} ${fn}`,
+    };
   }
 
   remove(id: number) {
