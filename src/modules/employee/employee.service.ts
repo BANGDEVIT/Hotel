@@ -1,4 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
 import { QueryEmployeeDTO } from './dto/query-employee.dto';
@@ -26,11 +31,11 @@ export class EmployeeService {
     }
 
     if (position) {
-      where.position = { contains: { position }, mode: 'insensitve' };
+      where.position = { contains: position, mode: 'insensitve' };
     }
 
     if (gender) {
-      where.gender = { contains: { position }, mode: 'insensitive' };
+      where.gender = { contains: gender, mode: 'insensitive' };
     }
 
     const [employeesRaw, total] = await Promise.all([
@@ -56,7 +61,7 @@ export class EmployeeService {
             },
           },
         },
-        orderBy: { first_name: 'asc', last_name: 'asc' },
+        orderBy: [{ last_name: 'asc' }, { first_name: 'asc' }],
       }),
 
       this.prisma.employee.count({ where }),
@@ -66,7 +71,7 @@ export class EmployeeService {
       const { first_name, last_name, ...rest } = em;
       return {
         ...rest,
-        full_name: `${last_name} + ${first_name}`,
+        full_name: `${last_name} ${first_name}`,
       };
     });
 
@@ -79,12 +84,124 @@ export class EmployeeService {
     };
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} employee`;
+  async findOne(id: string) {
+    const employeeRaw = await this.prisma.employee.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        first_name: true,
+        last_name: true,
+        email: true,
+        phone: true,
+        position: true,
+
+        salary: true,
+        hired_date: true,
+        gender: true,
+        account: {
+          select: {
+            id: true,
+            email: true,
+            is_active: true,
+          },
+        },
+      },
+    });
+
+    if (!employeeRaw) {
+      throw new NotFoundException(`Không tìm thấy nhân viên với id: ${id}`);
+    }
+
+    const full_name = employeeRaw.last_name + employeeRaw.first_name;
+
+    const employee = { ...employeeRaw, full_name };
+
+    return employee;
   }
 
-  create(createEmployeeDto: CreateEmployeeDto) {
-    return 'This action adds a new employee';
+  async create(createEmployeeDto: CreateEmployeeDto) {
+    const {
+      email,
+      password,
+      first_name,
+      last_name,
+      phone,
+      position,
+      salary,
+      hired_date,
+      gender,
+      role,
+    } = createEmployeeDto;
+
+    const existingAccount = await this.prisma.account.findUnique({
+      where: { email },
+    });
+
+    if (existingAccount) {
+      throw new ConflictException('Email has already been used');
+    }
+
+    const roleRecord = await this.prisma.role.findUnique({
+      where: { name: role },
+    });
+
+    if (!roleRecord) {
+      throw new NotFoundException(`Role ${role} doesn not exist`);
+    }
+
+    const employee = await this.prisma.$transaction(async (tx) => {
+      const hashPassword = await bcrypt.hash(password, 10);
+
+      // 1. Tạo account
+      const account = await tx.account.create({
+        data: {
+          email,
+          hash_password: hashPassword,
+          role_account: {
+            create: { role_id: roleRecord.id },
+          },
+        },
+      });
+
+      // 2. Tạo employee
+      const newEmployee = await tx.employee.create({
+        data: {
+          account_id: account.id,
+          first_name,
+          last_name,
+          phone,
+          position,
+          salary,
+          hired_date: new Date(hired_date),
+          gender,
+        },
+        select: {
+          id: true,
+          first_name: true,
+          last_name: true,
+          email: true,
+          phone: true,
+          position: true,
+          salary: true,
+          hired_date: true,
+          gender: true,
+          account: {
+            select: {
+              id: true,
+              email: true,
+              is_active: true,
+            },
+          },
+        },
+      });
+      return newEmployee;
+    });
+
+    const { first_name: fn, last_name: ln, ...rest } = employee;
+    return {
+      ...rest,
+      full_name: `${ln} ${fn}`,
+    };
   }
 
   update(id: number, updateEmployeeDto: UpdateEmployeeDto) {
