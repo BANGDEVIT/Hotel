@@ -149,7 +149,16 @@ export class EmployeeController {
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.employeeService.remove(+id);
+  @HttpCode(204)
+  @Roles('manager', 'admin')
+  @ApiOperation({
+    summary: 'Xóa mềm tài khoản nhân viên',
+    description: 'Chỉ manager và admin mới có quyền xóa',
+  })
+  @ApiResponse({ status: 204, description: 'Xóa mềm tài khoản thành công' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy nhân viên' })
+  async remove(@Param('id') id: string) {
+    await this.employeeService.remove(id);
+    return;
   }
 }

@@ -7,7 +7,7 @@ export class UpdateEmployeeDto extends PartialType(
 ) {
   @ApiPropertyOptional({
     example: true,
-    description: 'Kích hoạt/khóa tài khoản',
+    description: 'Kích hoạt/khoản',
   })
   @IsOptional()
   @IsBoolean()

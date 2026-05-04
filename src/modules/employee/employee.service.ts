@@ -307,7 +307,23 @@ export class EmployeeService {
     });
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} employee`;
+  async remove(id: string): Promise<void> {
+    const existingEmployee = await this.prisma.employee.findUnique({
+      where: {
+        id,
+      },
+      include: { account: true },
+    });
+
+    if (!existingEmployee) {
+      throw new NotFoundException('Emploiyee does not exist');
+    }
+
+    await this.prisma.account.update({
+      where: { id: existingEmployee.account_id },
+      data: {
+        is_active: false,
+      },
+    });
   }
 }
