@@ -90,6 +90,7 @@ model Employee {
   first_name String   @db.VarChar
   last_name  String   @db.VarChar
   email      String?  @db.VarChar
+  avatar_url String?  @db.VarChar
   phone      String   @db.VarChar
   salary     Decimal  @default(0)
   hired_date DateTime @db.Date

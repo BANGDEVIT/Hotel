@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Decimal } from '@prisma/client/runtime/client';
 
 // ← Tách class riêng cho account
@@ -40,6 +40,38 @@ export class EmployeeResponseDto {
 
   @ApiProperty({ type: AccountInEmployeeDto })
   account: AccountInEmployeeDto;
+}
+
+export class EmployeeProfileResponseDto {
+  @ApiProperty({ example: 'uuid123' })
+  id: string;
+
+  @ApiProperty({ example: 'Bui Cong Bang' })
+  full_name: string;
+
+  @ApiProperty({ example: 'bcb@gmail.com' })
+  email: string;
+
+  @ApiProperty({ example: '0909123456' })
+  phone: string;
+
+  @ApiPropertyOptional({
+    example:
+      'https://my-bucket.s3.ap-southeast-1.amazonaws.com/avatars/user123.png',
+  })
+  avatar_url?: string;
+
+  @ApiProperty({ example: 'receptionist' })
+  position: string;
+
+  @ApiProperty({ example: '2024-01-01' })
+  hired_date: Date;
+
+  @ApiProperty({ example: 'male' })
+  gender: string;
+
+  // @ApiProperty({ type: AccountInEmployeeDto })
+  // account: AccountInEmployeeDto;
 }
 
 export class PaginatedEmployeeResponseDto {

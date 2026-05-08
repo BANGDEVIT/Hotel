@@ -1,13 +1,17 @@
 import {
   ConflictException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
-import { UpdateEmployeeDto } from './dto/update-employee.dto';
+import { UpdateEmployeeDto, UpdateProfileDto } from './dto/update-employee.dto';
 import { QueryEmployeeDTO } from './dto/query-employee.dto';
-import { PaginatedEmployeeResponseDto } from './dto/employee-response';
+import {
+  EmployeeProfileResponseDto,
+  PaginatedEmployeeResponseDto,
+} from './dto/employee-response';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 
@@ -325,5 +329,92 @@ export class EmployeeService {
         is_active: false,
       },
     });
+  }
+
+  async getProfile(id: string): Promise<EmployeeProfileResponseDto> {
+    const employee = await this.prisma.employee.findUnique({
+      where: { account_id: id },
+      select: {
+        id: true,
+        first_name: true,
+        last_name: true,
+        email: true,
+        phone: true,
+        position: true,
+        hired_date: true,
+        gender: true,
+        avatar_url: true,
+      },
+    });
+
+    if (!employee) {
+      throw new NotFoundException('Employee does not exist');
+    }
+    try {
+      const { first_name, last_name, ...rest } = employee;
+      const fullName: string = `${last_name} ${first_name}`;
+      return {
+        ...rest,
+        full_name: fullName,
+      };
+    } catch (error) {
+      console.error('Error during getProfile in Employee service:', error);
+      throw new InternalServerErrorException(
+        'An error occurred during getProfile in Employee service:',
+      );
+    }
+  }
+
+  async updateProfile(
+    id: string,
+    updateProfile: UpdateProfileDto,
+  ): Promise<EmployeeProfileResponseDto> {
+    const employee = await this.prisma.employee.findUnique({
+      where: {
+        account_id: id,
+      },
+    });
+
+    if (!employee) {
+      throw new NotFoundException('Employee does not exists');
+    }
+
+    try {
+      const { first_name, last_name, phone, avatar_url, gender } =
+        updateProfile;
+
+      const employeeUpdate = await this.prisma.employee.update({
+        where: { account_id: id },
+        data: {
+          ...(first_name && { first_name }),
+          ...(last_name && { last_name }),
+          ...(phone && { phone }),
+          ...(avatar_url && { avatar_url }),
+          ...(gender && { gender }),
+        },
+        select: {
+          id: true,
+          first_name: true,
+          last_name: true,
+          email: true,
+          phone: true,
+          position: true,
+          hired_date: true,
+          gender: true,
+          avatar_url: true,
+        },
+      });
+      const { first_name: fn, last_name: ln, ...rest } = employeeUpdate;
+      const fullName: string = `${ln} ${fn}`;
+      return {
+        ...rest,
+        full_name: fullName,
+      };
+    } catch (error) {
+      console.error('Error during update profile in Employee service:', error);
+      throw new InternalServerErrorException(
+        'An error occurred during update profile in Employee service:',
+      );
+    }
   }
 }
