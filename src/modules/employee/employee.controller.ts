@@ -28,6 +28,7 @@ import {
 } from './dto/employee-response';
 import { QueryEmployeeDTO } from './dto/query-employee.dto';
 import { GetAccount } from '../../common/decorators/get-account.decorator';
+import { UpdatePasswordDto } from './dto/reset-password.dto';
 
 @ApiTags('employees')
 @ApiBearerAuth('jwt-auth')
@@ -151,6 +152,29 @@ export class EmployeeController {
     @Body() updateEmployeeDto: UpdateEmployeeDto,
   ) {
     return this.employeeService.update(id, updateEmployeeDto);
+  }
+
+  @Patch('profile/password')
+  @HttpCode(200)
+  @Roles('staff', 'admin', 'manager')
+  @ApiOperation({
+    summary: 'Đổi mật khẩu',
+    description:
+      'Nhân viên tự đổi mật khẩu — cần nhập email và mật khẩu hiện tại',
+  })
+  @ApiResponse({ status: 200, description: 'Đổi mật khẩu thành công' })
+  @ApiResponse({
+    status: 400,
+    description: 'Email hoặc mật khẩu hiện tại không đúng',
+  })
+  @ApiResponse({ status: 401, description: 'Chưa đăng nhập' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy tài khoản' })
+  async updatePassword(
+    @GetAccount('sub') accountId: string,
+    @Body() updatePasswordDto: UpdatePasswordDto,
+  ): Promise<{ message: string }> {
+    await this.employeeService.updatePassword(accountId, updatePasswordDto);
+    return { message: 'Change Password successfully' };
   }
 
   @Patch(':id/reset-password')

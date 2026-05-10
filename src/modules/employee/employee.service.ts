@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   InternalServerErrorException,
@@ -14,6 +15,7 @@ import {
 } from './dto/employee-response';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
+import { UpdatePasswordDto } from './dto/reset-password.dto';
 
 @Injectable()
 export class EmployeeService {
@@ -416,5 +418,35 @@ export class EmployeeService {
         'An error occurred during update profile in Employee service:',
       );
     }
+  }
+
+  async updatePassword(accountId: string, dto: UpdatePasswordDto) {
+    const { email, password, newPassword } = dto;
+    const account = await this.prisma.account.findUnique({
+      where: { id: accountId },
+      select: { email: true, hash_password: true },
+    });
+
+    if (!account) {
+      throw new NotFoundException('AcountId not exsits');
+    }
+
+    if (account.email !== email) {
+      throw new BadRequestException('Email or password is incorrect');
+    }
+
+    const isMatch = await bcrypt.compare(password, account.hash_password);
+    if (!isMatch) {
+      throw new BadRequestException('Email or password is incorrect');
+    }
+
+    const newHashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await this.prisma.account.update({
+      where: { id: accountId },
+      data: {
+        hash_password: newHashedPassword,
+      },
+    });
   }
 }

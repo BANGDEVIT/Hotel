@@ -3,6 +3,8 @@ import { AppModule } from './app.module';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { TransformInterceptor } from './common/interceptors/transform.interceptor';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 // import * as cookieParser from 'cookie-parser';
 
 async function bootstrap() {
@@ -69,6 +71,11 @@ async function bootstrap() {
   `,
   });
 
+  //Interceptors
+  app.useGlobalInterceptors(new TransformInterceptor()); // ← thêm dòng này
+
+  //Filters
+  app.useGlobalFilters(new HttpExceptionFilter()); // ← thêm
   await app.listen(process.env.PORT);
 }
 bootstrap().catch((error) => {

@@ -27,7 +27,7 @@ import { ShiftsModule } from './modules/shifts/shifts.module';
     },
     {
       provide: APP_GUARD,
-      useClass: RolesGuard, //  ← tất cả route đều cần auth // thoát nếu không có @Roles()
+      useClass: RolesGuard, //  ← tất cả route đều cần // thoát nếu không có @Roles()
     },
   ],
 })
