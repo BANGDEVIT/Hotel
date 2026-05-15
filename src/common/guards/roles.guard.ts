@@ -12,12 +12,15 @@ export class RolesGuard implements CanActivate {
       [context.getHandler(), context.getClass()],
     );
 
+    // console.log('requiredRoles:', requiredRoles); // ← thêm
+
     // Không có @Roles() → cho qua
     if (!requiredRoles) return true;
 
-    const { account } = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest();
+    const user = request.user; // ← lấy từ request
 
     // ← user.roles là array vì 1 account có thể có nhiều role
-    return requiredRoles.some((role) => account.roles?.includes(role));
+    return requiredRoles.some((role) => user?.roles?.includes(role));
   }
 }

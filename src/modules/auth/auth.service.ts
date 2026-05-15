@@ -111,7 +111,7 @@ export class AuthService {
 
     const tokens = await this.generateTokens(account.id, roles);
     await this.saveRefreshToken(account.id, tokens.refreshToken);
-
+    console.log('ok');
     return {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,

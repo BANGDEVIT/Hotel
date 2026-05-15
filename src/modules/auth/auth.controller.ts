@@ -1,4 +1,12 @@
-import { Body, Controller, HttpCode, Post, Req, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  HttpCode,
+  Post,
+  Req,
+  Res,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDTO } from './dto/register.dto';
 import { RegisterResponseDto } from './dto/auth-response.dto';
@@ -92,7 +100,12 @@ export class AuthController {
   })
   async refresh(@Req() req: Request) {
     // ← Lấy refresh token từ cookie
-    const refreshToken = req.cookies['refresh_token'];
+    // const refreshToken = req.cookies['refresh_token'];
+    const refreshToken = req.cookies['refresh-token'];
+
+    if (!refreshToken) {
+      throw new UnauthorizedException('Refresh token không tồn tại');
+    }
 
     const { accessToken } = await this.authService.refreshToken(refreshToken);
 

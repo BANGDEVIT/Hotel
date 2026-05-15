@@ -8,7 +8,10 @@ export class QueryEmployeeDTO {
   @Min(1)
   page?: number = 1;
 
-  @ApiPropertyOptional({ example: 10, description: 'Số lượng mỗi trang' })
+  @ApiPropertyOptional({
+    example: 10,
+    description: 'Số lượng nhân viên mỗi trang',
+  })
   @IsOptional()
   @IsInt()
   @Min(1)

@@ -41,7 +41,7 @@ export class EmployeeService {
     }
 
     if (position) {
-      where.position = { contains: position, mode: 'insensitve' };
+      where.position = { contains: position, mode: 'insensitive' };
     }
 
     if (gender) {

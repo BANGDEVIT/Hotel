@@ -41,6 +41,23 @@ enum InvoiceStatus {
   partially_paid
 }
 
+enum ShiftName {
+  morning
+  afternoon
+  evening
+  night
+}
+
+enum DayOfWeek {
+  monday
+  tuesday
+  wednesday
+  thursday
+  friday
+  saturday
+  sunday
+}
+
 // ===== MODELS =====
 
 model Account {
@@ -117,12 +134,17 @@ model EmployeeShift {
 }
 
 model Shift {
-  id         String   @id @default(uuid()) @db.Uuid
-  name       String   @db.VarChar
-  start_time DateTime @db.Time
-  end_time   DateTime @db.Time
+  id          String    @id @default(uuid()) @db.Uuid
+  name        ShiftName
+  day_of_week DayOfWeek
+  start_time  DateTime  @db.Time
+  end_time    DateTime  @db.Time
+  created_at  DateTime  @default(now()) // ← thêm
+  updated_at  DateTime  @updatedAt
 
   employee_shifts EmployeeShift[]
+
+  @@unique([name, day_of_week])
 }
 
 model Booking {

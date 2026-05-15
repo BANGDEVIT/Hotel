@@ -31,7 +31,7 @@ import { GetAccount } from '../../common/decorators/get-account.decorator';
 import { UpdatePasswordDto } from './dto/reset-password.dto';
 
 @ApiTags('employees')
-@ApiBearerAuth('jwt-auth')
+@ApiBearerAuth('JWT-auth')
 @Controller('employees')
 export class EmployeeController {
   constructor(private readonly employeeService: EmployeeService) {}
@@ -75,6 +75,63 @@ export class EmployeeController {
     @GetAccount('sub') accountId: string,
   ): Promise<EmployeeProfileResponseDto> {
     return this.employeeService.getProfile(accountId);
+  }
+
+  @Patch('profile')
+  @HttpCode(200)
+  @Roles('staff', 'admin', 'manager')
+  @ApiOperation({
+    summary: 'Cập nhật thông tin cá nhân',
+    description: 'Cập nhật thông tin + ảnh đại diện cùng lúc',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        first_name: { type: 'string', example: 'Bang' },
+        last_name: { type: 'string', example: 'Bui' },
+        phone: { type: 'string', example: '0909123456' },
+        gender: { type: 'string', example: 'male' },
+        // file: { type: 'string', format: 'binary' }, // ← file upload
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Cập nhật thành công',
+    type: EmployeeProfileResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ' })
+  @ApiResponse({ status: 401, description: 'Chưa đăng nhập' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy nhân viên' })
+  async updateProfile(
+    @GetAccount('sub') accountId: string,
+    @Body() updateProfile: UpdateProfileDto,
+  ): Promise<EmployeeProfileResponseDto> {
+    return this.employeeService.update(accountId, updateProfile);
+  }
+
+  @Patch('profile/password')
+  @HttpCode(200)
+  @Roles('staff', 'admin', 'manager')
+  @ApiOperation({
+    summary: 'Đổi mật khẩu',
+    description:
+      'Nhân viên tự đổi mật khẩu — cần nhập email và mật khẩu hiện tại',
+  })
+  @ApiResponse({ status: 200, description: 'Đổi mật khẩu thành công' })
+  @ApiResponse({
+    status: 400,
+    description: 'Email hoặc mật khẩu hiện tại không đúng',
+  })
+  @ApiResponse({ status: 401, description: 'Chưa đăng nhập' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy tài khoản' })
+  async updatePassword(
+    @GetAccount('sub') accountId: string,
+    @Body() updatePasswordDto: UpdatePasswordDto,
+  ): Promise<{ message: string }> {
+    await this.employeeService.updatePassword(accountId, updatePasswordDto);
+    return { message: 'Change Password successfully' };
   }
 
   @Get(':id')
@@ -154,29 +211,6 @@ export class EmployeeController {
     return this.employeeService.update(id, updateEmployeeDto);
   }
 
-  @Patch('profile/password')
-  @HttpCode(200)
-  @Roles('staff', 'admin', 'manager')
-  @ApiOperation({
-    summary: 'Đổi mật khẩu',
-    description:
-      'Nhân viên tự đổi mật khẩu — cần nhập email và mật khẩu hiện tại',
-  })
-  @ApiResponse({ status: 200, description: 'Đổi mật khẩu thành công' })
-  @ApiResponse({
-    status: 400,
-    description: 'Email hoặc mật khẩu hiện tại không đúng',
-  })
-  @ApiResponse({ status: 401, description: 'Chưa đăng nhập' })
-  @ApiResponse({ status: 404, description: 'Không tìm thấy tài khoản' })
-  async updatePassword(
-    @GetAccount('sub') accountId: string,
-    @Body() updatePasswordDto: UpdatePasswordDto,
-  ): Promise<{ message: string }> {
-    await this.employeeService.updatePassword(accountId, updatePasswordDto);
-    return { message: 'Change Password successfully' };
-  }
-
   @Patch(':id/reset-password')
   @HttpCode(200)
   @Roles('manager', 'admin')
@@ -208,39 +242,5 @@ export class EmployeeController {
   async remove(@Param('id') id: string) {
     await this.employeeService.remove(id);
     return;
-  }
-
-  @Patch('profile')
-  @HttpCode(200)
-  @Roles('staff', 'admin', 'manager')
-  @ApiOperation({
-    summary: 'Cập nhật thông tin cá nhân',
-    description: 'Cập nhật thông tin + ảnh đại diện cùng lúc',
-  })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        first_name: { type: 'string', example: 'Bang' },
-        last_name: { type: 'string', example: 'Bui' },
-        phone: { type: 'string', example: '0909123456' },
-        gender: { type: 'string', example: 'male' },
-        // file: { type: 'string', format: 'binary' }, // ← file upload
-      },
-    },
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Cập nhật thành công',
-    type: EmployeeProfileResponseDto,
-  })
-  @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ' })
-  @ApiResponse({ status: 401, description: 'Chưa đăng nhập' })
-  @ApiResponse({ status: 404, description: 'Không tìm thấy nhân viên' })
-  async updateProfile(
-    @GetAccount('sub') accountId: string,
-    @Body() updateProfile: UpdateProfileDto,
-  ): Promise<EmployeeProfileResponseDto> {
-    return this.employeeService.update(accountId, updateProfile);
   }
 }
