@@ -126,7 +126,20 @@ export class ShiftsController {
   }
 
   @Delete(':id')
+  @HttpCode(204)
+  @Roles('manager', 'admin')
+  @ApiOperation({
+    summary: 'Xóa ca làm việc',
+    description: 'Chỉ manager mới có quyền xóa',
+  })
+  @ApiResponse({ status: 204, description: 'Xóa ca làm thành công' })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Vẫn còn nhân viên trong ca làm không thế xóa, cần phải xóa nhân viên trước',
+  })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy ca làm việc' })
   remove(@Param('id') id: string) {
-    return this.shiftsService.remove(+id);
+    return this.shiftsService.remove(id);
   }
 }

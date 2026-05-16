@@ -240,7 +240,24 @@ export class ShiftsService {
     };
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} shift`;
+  async remove(id: string) {
+    const shift = await this.prisma.shift.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: { employee_shifts: true },
+        },
+      },
+    });
+
+    if (!shift) {
+      throw new NotFoundException('shift dose not exist');
+    }
+
+    if (shift._count.employee_shifts > 0) {
+      throw new BadRequestException('Employees has this shift');
+    }
+
+    await this.prisma.shift.delete({ where: { id } });
   }
 }
