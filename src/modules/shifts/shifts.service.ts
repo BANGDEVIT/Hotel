@@ -18,6 +18,7 @@ import {
   AssignEmployeeDto,
   AssignEmployeeResponseDto,
 } from './dto/assign-employees.dto';
+import { QueryScheduleDto } from './dto/schedule.dto';
 
 @Injectable()
 export class ShiftsService {
@@ -348,5 +349,129 @@ export class ShiftsService {
       total_assigned: assignedEmployees.length,
       employees: assignedEmployees,
     };
+  }
+
+  async removeEmployee(
+    shiftId: string,
+    employeeId: string,
+    work_date: string,
+  ): Promise<void> {
+    const shift = await this.prisma.shift.findUnique({
+      where: { id: shiftId },
+    });
+
+    if (!shift) {
+      throw new NotFoundException('Shift does not exist');
+    }
+
+    const existingEmployeeShift = await this.prisma.employeeShift.findFirst({
+      where: {
+        shift_id: shiftId,
+        employee_id: employeeId,
+        work_date: new Date(work_date),
+      },
+    });
+
+    if (!existingEmployeeShift) {
+      throw new NotFoundException(
+        'The employee was not assigned to this shift on that day.',
+      );
+    }
+
+    await this.prisma.employeeShift.delete({
+      where: { id: existingEmployeeShift.id },
+    });
+  }
+
+  async getSchedule(query: QueryScheduleDto) {
+    const { search, work_date, week } = query;
+
+    const where: any = {};
+
+    if (work_date && week) {
+      throw new BadRequestException(
+        'Không thể dùng work_date và week cùng lúc',
+      );
+    }
+
+    // Filter theo tên nhân viên
+    if (search) {
+      where.employee = {
+        OR: [
+          { first_name: { contains: search, mode: 'insensitive' } },
+          { last_name: { contains: search, mode: 'insensitive' } },
+        ],
+      };
+    }
+
+    // Filter theo ngày cụ thể
+    if (work_date) {
+      where.work_date = new Date(work_date);
+    }
+
+    // Filter theo tuần (thứ 2 → chủ nhật)
+    if (week) {
+      const date = new Date(week);
+      const day = date.getDay(); // 0 = CN, 1 = T2...
+
+      // Tính thứ 2 đầu tuần
+      const monday = new Date(date);
+      monday.setDate(date.getDate() - (day === 0 ? 6 : day - 1));
+      monday.setHours(0, 0, 0, 0);
+
+      // Tính chủ nhật cuối tuần
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      sunday.setHours(23, 59, 59, 999);
+
+      where.work_date = {
+        gte: monday, // ← từ thứ 2
+        lte: sunday, // ← đến chủ nhật
+      };
+    }
+
+    const schedules = await this.prisma.employeeShift.findMany({
+      where,
+      select: {
+        id: true,
+        work_date: true,
+        employee: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            position: true,
+            avatar_url: true,
+          },
+        },
+        shift: {
+          select: {
+            name: true,
+            day_of_week: true,
+            start_time: true,
+            end_time: true,
+          },
+        },
+      },
+      orderBy: [{ work_date: 'asc' }, { shift: { start_time: 'asc' } }],
+    });
+
+    // Format response
+    return schedules.map((s) => ({
+      id: s.id,
+      work_date: s.work_date.toISOString().slice(0, 10), // → "2026-05-12"
+      employee: {
+        id: s.employee.id,
+        full_name: `${s.employee.last_name} ${s.employee.first_name}`,
+        position: s.employee.position,
+        avatar_url: s.employee.avatar_url,
+      },
+      shift: {
+        name: s.shift.name,
+        day_of_week: s.shift.day_of_week,
+        start_time: s.shift.start_time.toTimeString().slice(0, 5),
+        end_time: s.shift.end_time.toTimeString().slice(0, 5),
+      },
+    }));
   }
 }

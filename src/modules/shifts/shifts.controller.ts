@@ -17,6 +17,7 @@ import {
   ApiBearerAuth,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -30,6 +31,8 @@ import {
   AssignEmployeeDto,
   AssignEmployeeResponseDto,
 } from './dto/assign-employees.dto';
+import { RemoveEmployeeQueryDto } from './dto/remove-employee-shift.dto';
+import { QueryScheduleDto } from './dto/schedule.dto';
 
 @ApiTags('shifts')
 @ApiBearerAuth('JWT-auth')
@@ -37,24 +40,44 @@ import {
 export class ShiftsController {
   constructor(private readonly shiftsService: ShiftsService) {}
 
-  @Post()
-  @HttpCode(201)
-  @Roles('manager', 'admin')
+  @Get('schedule')
+  @HttpCode(200)
+  @Roles('manager', 'admin', 'staff')
   @ApiOperation({
-    summary: 'Tạo ca làm mới',
-    description: 'Tạo ca làm mới. Chỉ có managerment mới có quyền',
+    summary: 'Xem lịch làm việc tổng hợp',
+    description: 'Hỗ trợ filter theo tên nhân viên, ngày cụ thể hoặc cả tuần',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Tìm theo tên nhân viên',
+    example: 'Nguyen Bang',
+  })
+  @ApiQuery({
+    name: 'work_date',
+    required: false,
+    description: 'Lọc theo ngày cụ thể (YYYY-MM-DD)',
+    example: '2026-05-12',
+  })
+  @ApiQuery({
+    name: 'week',
+    required: false,
+    description:
+      'Xem lịch cả tuần — truyền 1 ngày bất kỳ trong tuần (YYYY-MM-DD)',
+    example: '2026-05-12',
   })
   @ApiResponse({
-    status: 201,
-    description: 'Tạo ca mới thành công',
-    type: ResponseShiftDto,
+    status: 200,
+    description: 'Trả về lịch làm việc',
   })
-  @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ' })
+  @ApiResponse({
+    status: 400,
+    description: 'Không thể dùng work_date và week cùng lúc',
+  })
   @ApiResponse({ status: 401, description: 'Chưa đăng nhập' })
   @ApiResponse({ status: 403, description: 'Không có quyền truy cập' })
-  @ApiResponse({ status: 409, description: 'Ca làm việc đã tồn tại' })
-  create(@Body() createShiftDto: CreateShiftDto): Promise<ResponseShiftDto> {
-    return this.shiftsService.create(createShiftDto);
+  async getSchedule(@Query() query: QueryScheduleDto) {
+    return this.shiftsService.getSchedule(query);
   }
 
   @Get()
@@ -75,6 +98,26 @@ export class ShiftsController {
     @Query() query: QueryShiftDTO,
   ): Promise<PaginatedShiftResponseDto> {
     return this.shiftsService.findAll(query);
+  }
+
+  @Post()
+  @HttpCode(201)
+  @Roles('manager', 'admin')
+  @ApiOperation({
+    summary: 'Tạo ca làm mới',
+    description: 'Tạo ca làm mới. Chỉ có managerment mới có quyền',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Tạo ca mới thành công',
+    type: ResponseShiftDto,
+  })
+  @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ' })
+  @ApiResponse({ status: 401, description: 'Chưa đăng nhập' })
+  @ApiResponse({ status: 403, description: 'Không có quyền truy cập' })
+  @ApiResponse({ status: 409, description: 'Ca làm việc đã tồn tại' })
+  create(@Body() createShiftDto: CreateShiftDto): Promise<ResponseShiftDto> {
+    return this.shiftsService.create(createShiftDto);
   }
 
   @Get(':id')
@@ -174,5 +217,45 @@ export class ShiftsController {
     @Body() dto: AssignEmployeeDto,
   ): Promise<AssignEmployeeResponseDto> {
     return this.shiftsService.assignEmployees(shiftId, dto);
+  }
+
+  // DELETE /shifts/:id/employees/:employeeId?work_date=2026-05-12
+  @Delete(':id/employees/:employeeId')
+  @HttpCode(200)
+  @Roles('manager', 'admin')
+  @ApiOperation({
+    summary: 'Xóa nhân viên khỏi ca',
+    description: 'Xóa nhân viên khỏi ca làm việc vào ngày cụ thể',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID của ca làm việc',
+    example: 'uuid-123',
+  })
+  @ApiParam({
+    name: 'employeeId',
+    description: 'UUID của nhân viên',
+    example: 'uuid-456',
+  })
+  @ApiQuery({
+    name: 'work_date',
+    description: 'Ngày làm việc (YYYY-MM-DD)',
+    example: '2026-05-12',
+  })
+  @ApiResponse({ status: 200, description: 'Xóa thành công' })
+  @ApiResponse({ status: 401, description: 'Chưa đăng nhập' })
+  @ApiResponse({ status: 403, description: 'Không có quyền truy cập' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy ca hoặc nhân viên' })
+  async removeEmployee(
+    @Param('id') shiftId: string,
+    @Param('employeeId') employeeId: string,
+    @Query() query: RemoveEmployeeQueryDto,
+  ): Promise<{ message: string }> {
+    await this.shiftsService.removeEmployee(
+      shiftId,
+      employeeId,
+      query.work_date,
+    );
+    return { message: 'Xóa nhân viên khỏi ca thành công' };
   }
 }
