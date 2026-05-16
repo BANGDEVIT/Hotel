@@ -14,6 +14,10 @@ import {
 } from './dto/response-shift.dto';
 import { QueryShiftDTO } from './dto/query-shift.dto';
 import { PrismaService } from '../../prisma/prisma.service';
+import {
+  AssignEmployeeDto,
+  AssignEmployeeResponseDto,
+} from './dto/assign-employees.dto';
 
 @Injectable()
 export class ShiftsService {
@@ -259,5 +263,90 @@ export class ShiftsService {
     }
 
     await this.prisma.shift.delete({ where: { id } });
+  }
+
+  async assignEmployees(
+    shiftId: string,
+    dto: AssignEmployeeDto,
+  ): Promise<AssignEmployeeResponseDto> {
+    const { employee_ids, work_date } = dto;
+
+    // 1. Check shift tồn tại
+    const shift = await this.prisma.shift.findUnique({
+      where: { id: shiftId },
+    });
+
+    if (!shift) {
+      throw new NotFoundException('Shift does not Exist');
+    }
+
+    // 2. Check tất cả employee tồn tại
+    const employees = await this.prisma.employee.findMany({
+      where: { id: { in: employee_ids } },
+      select: {
+        id: true,
+        first_name: true,
+        last_name: true,
+        position: true,
+      },
+    });
+
+    const foudIds = employees.map((e) => e.id);
+    const notFoundIds = employee_ids.filter((id) => !foudIds.includes(id));
+
+    if (notFoundIds.length > 0) {
+      throw new NotFoundException(
+        `Not found employee with id: ${notFoundIds.join(',')}`,
+      );
+    }
+
+    // 3. Check những ai đã được phân công rồi → bỏ qua
+    const existingAssignment = await this.prisma.employeeShift.findMany({
+      where: {
+        shift_id: shiftId,
+        work_date: new Date(work_date),
+        employee_id: { in: employee_ids },
+      },
+      select: { employee_id: true },
+    });
+
+    const assignedIds = existingAssignment.map((e) => e.employee_id);
+
+    // Lọc ra những người chưa được phân công
+    const newEmployeeIds = employee_ids.filter((e) => !assignedIds.includes(e));
+
+    if (newEmployeeIds.length === 0) {
+      throw new ConflictException('All employees already has assign in shift');
+    }
+
+    // 4. Tạo records mới
+    await this.prisma.employeeShift.createMany({
+      data: newEmployeeIds.map((employee_id) => ({
+        employee_id,
+        shift_id: shiftId,
+        work_date: new Date(work_date),
+      })),
+    });
+
+    // 5. Format response
+    const assignedEmployees = employees
+      .filter((e) => newEmployeeIds.includes(e.id))
+      .map((e) => ({
+        id: e.id,
+        full_name: `${e.last_name} ${e.first_name}`,
+        position: e.position,
+        work_date,
+      }));
+
+    return {
+      shift_id: shiftId,
+      shift_name: shift.name,
+      day_of_week: shift.day_of_week,
+      start_time: shift.start_time.toTimeString().slice(0, 5),
+      end_time: shift.end_time.toTimeString().slice(0, 5),
+      work_date: work_date,
+      total_assigned: assignedEmployees.length,
+      employees: assignedEmployees,
+    };
   }
 }

@@ -26,6 +26,10 @@ import {
   ShiftDetailResponseDto,
 } from './dto/response-shift.dto';
 import { QueryShiftDTO } from './dto/query-shift.dto';
+import {
+  AssignEmployeeDto,
+  AssignEmployeeResponseDto,
+} from './dto/assign-employees.dto';
 
 @ApiTags('shifts')
 @ApiBearerAuth('JWT-auth')
@@ -139,7 +143,36 @@ export class ShiftsController {
       'Vẫn còn nhân viên trong ca làm không thế xóa, cần phải xóa nhân viên trước',
   })
   @ApiResponse({ status: 404, description: 'Không tìm thấy ca làm việc' })
-  remove(@Param('id') id: string) {
+  async remove(@Param('id') id: string) {
     return this.shiftsService.remove(id);
+  }
+
+  @Post(':id/employees')
+  @HttpCode(201)
+  @Roles('manager', 'admin')
+  @ApiOperation({
+    summary: 'Phân công nhân viên vào ca',
+    description: 'Phân công nhiều nhân viên vào ca làm việc cùng lúc',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID của ca làm việc',
+    example: 'uuid-123',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Phân công thành công',
+    type: AssignEmployeeResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy ca hoặc nhân viên' })
+  @ApiResponse({
+    status: 409,
+    description: 'Tất cả nhân viên đã được phân công',
+  })
+  async assignEmployees(
+    @Param('id') shiftId: string,
+    @Body() dto: AssignEmployeeDto,
+  ): Promise<AssignEmployeeResponseDto> {
+    return this.shiftsService.assignEmployees(shiftId, dto);
   }
 }
