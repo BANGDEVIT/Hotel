@@ -16,6 +16,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { UpdatePasswordDto } from './dto/reset-password.dto';
+import { QueryProfileShiftDto } from './dto/profile-employee.dto';
 
 @Injectable()
 export class EmployeeService {
@@ -448,5 +449,81 @@ export class EmployeeService {
         hash_password: newHashedPassword,
       },
     });
+  }
+
+  async getProfileShifts(accountId: string, query: QueryProfileShiftDto) {
+    const { week, work_date } = query;
+
+    // Check không dùng cả 2 cùng lúc
+    if (week && work_date) {
+      throw new BadRequestException(
+        'Do not filter work_date and web at the same time.',
+      );
+    }
+
+    // Tìm employee theo accountId
+    const employee = await this.prisma.employee.findUnique({
+      where: { account_id: accountId },
+    });
+
+    if (!employee) {
+      throw new NotFoundException('Employee does not exist');
+    }
+
+    const where: any = {
+      employee_id: employee.id,
+    };
+
+    // Filter theo ngày cụ thể
+    if (work_date) {
+      where.work_date = new Date(work_date);
+    }
+
+    // Filter theo tuần
+    if (week) {
+      const date = new Date(week);
+      const day = date.getDay();
+
+      const monday = new Date(date);
+      monday.setDate(date.getDate() - (day === 0 ? 6 : day - 1));
+      monday.setHours(0, 0, 0, 0);
+
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      sunday.setHours(23, 59, 59, 999);
+
+      where.work_date = {
+        gte: monday,
+        lte: sunday,
+      };
+    }
+
+    const shifts = await this.prisma.employeeShift.findMany({
+      where,
+      select: {
+        id: true,
+        work_date: true,
+        shift: {
+          select: {
+            name: true,
+            day_of_week: true,
+            start_time: true,
+            end_time: true,
+          },
+        },
+      },
+      orderBy: [{ work_date: 'asc' }, { shift: { start_time: 'asc' } }],
+    });
+
+    return shifts.map((s) => ({
+      id: s.id,
+      work_date: s.work_date.toISOString().slice(0, 10),
+      shift: {
+        name: s.shift.name,
+        day_of_week: s.shift.day_of_week,
+        start_time: s.shift.start_time.toTimeString().slice(0, 5),
+        end_time: s.shift.end_time.toTimeString().slice(0, 5),
+      },
+    }));
   }
 }

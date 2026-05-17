@@ -18,6 +18,7 @@ import {
   ApiBody,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -29,6 +30,7 @@ import {
 import { QueryEmployeeDTO } from './dto/query-employee.dto';
 import { GetAccount } from '../../common/decorators/get-account.decorator';
 import { UpdatePasswordDto } from './dto/reset-password.dto';
+import { QueryProfileShiftDto } from './dto/profile-employee.dto';
 
 @ApiTags('employees')
 @ApiBearerAuth('JWT-auth')
@@ -109,6 +111,43 @@ export class EmployeeController {
     @Body() updateProfile: UpdateProfileDto,
   ): Promise<EmployeeProfileResponseDto> {
     return this.employeeService.update(accountId, updateProfile);
+  }
+
+  @Get('profile/shifts')
+  @HttpCode(200)
+  @Roles('staff', 'manager', 'admin')
+  @ApiOperation({
+    summary: 'Xem lịch làm việc của bản thân',
+    description:
+      'Nhân viên xem lịch làm việc của chính mình theo ngày hoặc tuần',
+  })
+  @ApiQuery({
+    name: 'week',
+    required: false,
+    description: 'Xem cả tuần — truyền 1 ngày bất kỳ trong tuần (YYYY-MM-DD)',
+    example: '2026-05-12',
+  })
+  @ApiQuery({
+    name: 'work_date',
+    required: false,
+    description: 'Lọc theo ngày cụ thể (YYYY-MM-DD)',
+    example: '2026-05-12',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Trả về lịch làm việc',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Không thể dùng work_date và week cùng lúc',
+  })
+  @ApiResponse({ status: 401, description: 'Chưa đăng nhập' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy nhân viên' })
+  async getProfileShifts(
+    @GetAccount('sub') accountId: string,
+    @Query() query: QueryProfileShiftDto,
+  ) {
+    return this.employeeService.getProfileShifts(accountId, query);
   }
 
   @Patch('profile/password')
