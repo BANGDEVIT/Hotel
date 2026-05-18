@@ -257,11 +257,14 @@ model Room {
 }
 
 model RoomType {
-  id         String  @id @default(uuid()) @db.Uuid
-  name       String  @db.VarChar
+  id         String   @id @default(uuid()) @db.Uuid
+  name       String   @unique @db.VarChar
   base_price Decimal
   capacity   Int
-  amenities  Json    @default("[]")
+  amenities  Json     @default("[]")
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  is_active  Boolean  @default(true)
 
   rooms Room[]
 }
