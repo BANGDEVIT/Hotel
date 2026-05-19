@@ -241,12 +241,13 @@ model BookingRoom {
 
 model Room {
   id           String     @id @default(uuid()) @db.Uuid
-  room_number  String     @unique @db.VarChar // unique
+  room_number  String     @unique @db.VarChar
   room_type_id String     @db.Uuid
   floor        Int
   status       RoomStatus @default(available)
   updated_at   DateTime   @updatedAt
   created_at   DateTime   @default(now())
+  images       Json       @default("[]")
 
   room_type             RoomType            @relation(fields: [room_type_id], references: [id])
   booking_rooms         BookingRoom[]
@@ -256,11 +257,20 @@ model Room {
   @@index([room_type_id]) // filter phòng theo loại
 }
 
+enum BedType {
+  single // 1 giường đơn
+  double // 1 giường đôi
+  twin // 2 giường đơn
+  king // 1 giường king
+  queen // 1 giường queen
+}
+
 model RoomType {
   id         String   @id @default(uuid()) @db.Uuid
   name       String   @unique @db.VarChar
   base_price Decimal
   capacity   Int
+  bed_type   BedType
   amenities  Json     @default("[]")
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt

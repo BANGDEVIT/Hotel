@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Amenity } from './create-room-type.dto';
+import { BedType } from '@prisma/client';
 
 export class RoomTypeResponseDto {
   @ApiProperty({ example: 'uuid123' })
@@ -20,6 +21,9 @@ export class RoomTypeResponseDto {
     isArray: true,
   })
   amenities: Amenity[];
+
+  @ApiProperty({ example: 'double', enum: BedType })
+  bed_type: BedType;
 
   @ApiProperty({ example: '2026-05-12T00:00:00.000Z' })
   created_at: Date;

@@ -8,6 +8,7 @@ import { RolesGuard } from './common/guards/roles.guard';
 import { EmployeeModule } from './modules/employee/employee.module';
 import { ShiftsModule } from './modules/shifts/shifts.module';
 import { RoomTypeModule } from './modules/room-type/room-type.module';
+import { RoomModule } from './modules/room/room.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { RoomTypeModule } from './modules/room-type/room-type.module';
     EmployeeModule,
     ShiftsModule,
     RoomTypeModule,
+    RoomModule,
   ],
   controllers: [],
   providers: [

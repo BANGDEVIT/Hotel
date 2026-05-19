@@ -19,7 +19,8 @@ export class RoomTypeService {
   async create(
     createRoomTypeDto: CreateRoomTypeDto,
   ): Promise<RoomTypeResponseDto> {
-    const { name, base_price, capacity, amenities } = createRoomTypeDto;
+    const { name, base_price, capacity, amenities, bed_type } =
+      createRoomTypeDto;
 
     const existingRoomType = await this.prisma.roomType.findFirst({
       where: { name },
@@ -35,6 +36,7 @@ export class RoomTypeService {
         base_price,
         capacity,
         amenities: amenities ?? [],
+        bed_type,
       },
       select: {
         id: true,
@@ -44,6 +46,7 @@ export class RoomTypeService {
         amenities: true,
         created_at: true,
         updated_at: true,
+        bed_type: true,
       },
     });
 
@@ -81,6 +84,7 @@ export class RoomTypeService {
           amenities: true,
           updated_at: true,
           created_at: true,
+          bed_type: true,
         },
 
         orderBy: { base_price: 'asc' },
@@ -115,6 +119,7 @@ export class RoomTypeService {
         amenities: true,
         created_at: true,
         updated_at: true,
+        bed_type: true,
       },
     });
 
@@ -133,7 +138,8 @@ export class RoomTypeService {
     id: string,
     updateRoomTypeDto: UpdateRoomTypeDto,
   ): Promise<RoomTypeResponseDto> {
-    const { base_price, name, amenities, capacity } = updateRoomTypeDto;
+    const { base_price, name, amenities, capacity, bed_type } =
+      updateRoomTypeDto;
 
     const roomType = await this.prisma.roomType.findUnique({
       where: { id },
@@ -163,6 +169,7 @@ export class RoomTypeService {
         ...(base_price !== undefined && { base_price }),
         ...(capacity !== undefined && { capacity }),
         ...(amenities && { amenities }),
+        ...(bed_type && { bed_type }),
       },
       select: {
         id: true,
@@ -172,6 +179,7 @@ export class RoomTypeService {
         amenities: true,
         created_at: true,
         updated_at: true,
+        bed_type: true,
       },
     });
 

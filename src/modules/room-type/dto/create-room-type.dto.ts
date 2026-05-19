@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { BedType } from '@prisma/client';
 import {
   IsArray,
   IsEnum,
@@ -32,6 +33,15 @@ export class CreateRoomTypeDto {
   @IsNotEmpty({ message: 'Tên lọa phòng không được để trống' })
   @IsString()
   name: string;
+
+  @ApiProperty({
+    example: 'double',
+    enum: BedType,
+    description: 'Loại giường',
+  })
+  @IsNotEmpty()
+  @IsEnum(BedType, { message: 'Loại giường không hợp lệ' })
+  bed_type: BedType;
 
   @ApiProperty({
     example: 500000,
