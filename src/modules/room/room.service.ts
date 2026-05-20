@@ -325,14 +325,14 @@ export class RoomService {
     return roomType;
   }
 
-  available   → cleaning ✅
-available   → maintenance ✅
-available   → occupied ❌ (hệ thống tự đổi khi check-in)
-cleaning    → available ✅
-maintenance → available ✅
-occupied    → cleaning ✅ (sau check-out)
-occupied    → available ❌ (phải qua cleaning trước)
-inactive    → bất kỳ ❌ (đã xóa mềm)
+  // available   → cleaning ✅
+  // available   → maintenance ✅
+  // available   → occupied ❌ (hệ thống tự đổi khi check-in)npm
+  // cleaning    → available ✅
+  // maintenance → available ✅
+  // occupied    → cleaning ✅ (sau check-out)
+  // occupied    → available ❌ (phải qua cleaning trước)
+  // inactive    → bất kỳ ❌ (đã xóa mềm)
   async updateStatus(id: string, dto: UpdateRoomStatusDto) {
     const { status: newStatus } = dto;
     const room = await this.prisma.room.findUnique({

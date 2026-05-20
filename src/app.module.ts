@@ -9,6 +9,7 @@ import { EmployeeModule } from './modules/employee/employee.module';
 import { ShiftsModule } from './modules/shifts/shifts.module';
 import { RoomTypeModule } from './modules/room-type/room-type.module';
 import { RoomModule } from './modules/room/room.module';
+import { CustomersModule } from './modules/customers/customers.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { RoomModule } from './modules/room/room.module';
     ShiftsModule,
     RoomTypeModule,
     RoomModule,
+    CustomersModule,
   ],
   controllers: [],
   providers: [

@@ -87,16 +87,19 @@ model RefreshToken {
 }
 
 model Customer {
-  id                   String  @id @default(uuid()) @db.Uuid
-  account_id           String  @unique @db.Uuid
-  first_name           String  @db.VarChar
-  last_name            String  @db.VarChar
-  email                String  @db.VarChar
-  phone                String? @db.VarChar
+  id                   String   @id @default(uuid()) @db.Uuid
+  account_id           String   @unique @db.Uuid
+  first_name           String   @db.VarChar
+  last_name            String   @db.VarChar
+  email                String   @db.VarChar
+  phone                String?  @db.VarChar
+  id_card              String?  @db.VarChar
   id_card_img_url      String?
   id_card_img_back_url String?
-  nationality          String? @db.VarChar
-  reward_points        Int     @default(0)
+  nationality          String?  @db.VarChar
+  reward_points        Int      @default(0)
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
 
   account  Account   @relation(fields: [account_id], references: [id])
   bookings Booking[]
