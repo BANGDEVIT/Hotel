@@ -1,6 +1,6 @@
 // dto/update-customer-profile.dto.ts
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEmail, IsOptional, IsString } from 'class-validator';
+import { IsEmail, IsInt, IsOptional, IsString } from 'class-validator';
 
 // Customer tự cập nhật — ít field hơn, không có reward_points và is_active
 export class UpdateCustomerProfileDto {
@@ -33,6 +33,11 @@ export class UpdateCustomerProfileDto {
   @IsOptional()
   @IsString()
   nationality?: string;
+
+  @ApiPropertyOptional({ example: '100' })
+  @IsOptional()
+  @IsInt()
+  reward_points?: number;
 
   // ← Thêm sau khi setup AWS S3
   // @ApiPropertyOptional()

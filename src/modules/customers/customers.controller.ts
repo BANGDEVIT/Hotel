@@ -107,10 +107,55 @@ export class CustomersController {
     );
   }
 
+  // ==================== CHANGE PASSWORD ====================
+  @Patch('profile/password')
+  @HttpCode(HttpStatus.OK)
+  @Roles('customer')
+  @ApiOperation({
+    summary: 'Đổi mật khẩu',
+    description: 'Khách hàng đổi mật khẩu (yêu cầu mật khẩu hiện tại)',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Đổi mật khẩu thành công',
+    schema: {
+      example: {
+        message: 'Password changed successfully',
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description:
+      'Mật khẩu hiện tại không đúng hoặc mật khẩu mới trùng mật khẩu cũ',
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'Chưa đăng nhập',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Không có quyền truy cập',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Không tìm thấy tài khoản',
+  })
+  async changePassword(
+    @GetAccount('sub') accountId: string,
+    @Body() changePasswordDto: ChangePasswordDto,
+  ) {
+    await this.customerService.changePassword(accountId, changePasswordDto);
+
+    return {
+      message: 'Password changed successfully',
+    };
+  }
+
   // ==================== GET ALL CUSTOMERS ====================
   @Get()
   @HttpCode(HttpStatus.OK)
-  @Roles('manager', 'admin')
+  @Roles('staff', 'manager', 'admin')
   @ApiOperation({
     summary: 'Lấy danh sách khách hàng',
     description:
@@ -254,51 +299,6 @@ export class CustomersController {
 
     return {
       message: 'Customer deactivated successfully',
-    };
-  }
-
-  // ==================== CHANGE PASSWORD ====================
-  @Patch('profile/password')
-  @HttpCode(HttpStatus.OK)
-  @Roles('customer')
-  @ApiOperation({
-    summary: 'Đổi mật khẩu',
-    description: 'Khách hàng đổi mật khẩu (yêu cầu mật khẩu hiện tại)',
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Đổi mật khẩu thành công',
-    schema: {
-      example: {
-        message: 'Password changed successfully',
-      },
-    },
-  })
-  @ApiResponse({
-    status: HttpStatus.BAD_REQUEST,
-    description:
-      'Mật khẩu hiện tại không đúng hoặc mật khẩu mới trùng mật khẩu cũ',
-  })
-  @ApiResponse({
-    status: HttpStatus.UNAUTHORIZED,
-    description: 'Chưa đăng nhập',
-  })
-  @ApiResponse({
-    status: HttpStatus.FORBIDDEN,
-    description: 'Không có quyền truy cập',
-  })
-  @ApiResponse({
-    status: HttpStatus.NOT_FOUND,
-    description: 'Không tìm thấy tài khoản',
-  })
-  async changePassword(
-    @GetAccount('sub') accountId: string,
-    @Body() changePasswordDto: ChangePasswordDto,
-  ) {
-    await this.customerService.changePassword(accountId, changePasswordDto);
-
-    return {
-      message: 'Password changed successfully',
     };
   }
 }

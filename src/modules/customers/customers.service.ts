@@ -64,37 +64,13 @@ export class CustomersService {
         skip,
         take: limit,
         orderBy,
-        select: {
-          id: true,
-          first_name: true,
-          last_name: true,
-          email: true,
-          phone: true,
-          id_card: true,
-          // id_card_img_url: true,    ← thêm sau AWS S3
-          // id_card_img_back_url: true, ← thêm sau AWS S3
-          nationality: true,
-          reward_points: true,
-          updated_at: true,
-          account: {
-            select: {
-              id: true,
-              email: true,
-              is_active: true,
-            },
-          },
-        },
+        select: this.customerSelect(),
       }),
       this.prisma.customer.count({ where }),
     ]);
 
-    const customers = customersRaw.map((c) => ({
-      ...c,
-      full_name: `${c.last_name} ${c.first_name}`,
-    }));
-
     return {
-      data: customers,
+      data: customersRaw.map((c) => this.transformCustomer(c)),
       total,
       page,
       limit,
@@ -105,43 +81,14 @@ export class CustomersService {
   async findById(id: string) {
     const customer = await this.prisma.customer.findUnique({
       where: { id },
-      select: {
-        id: true,
-        first_name: true,
-        last_name: true,
-        phone: true,
-        id_card: true,
-        // id_card_img_url: true,
-        // id_card_img_back_url: true,
-        nationality: true,
-        reward_points: true,
-        updated_at: true,
-        account: {
-          select: {
-            id: true,
-            email: true,
-            is_active: true,
-          },
-        },
-      },
+      select: this.customerSelect(),
     });
 
     if (!customer) {
       throw new NotFoundException('Customer not found');
     }
 
-    return {
-      id: customer.id,
-      full_name: `${customer.last_name} ${customer.first_name}`,
-      phone: customer.phone,
-      id_card: customer.id_card,
-      // id_card_img_url: customer.id_card_img_url,
-      // id_card_img_back_url: customer.id_card_img_back_url,
-      nationality: customer.nationality,
-      reward_points: customer.reward_points,
-      updated_at: customer.updated_at,
-      account: customer.account,
-    };
+    return this.transformCustomer(customer);
   }
 
   async update(id: string, updateCustomerDto: UpdateCustomerDto) {
@@ -155,10 +102,17 @@ export class CustomersService {
     }
 
     // Tách account fields và customer fields
-    const { is_active, ...customerFields } = updateCustomerDto;
-
-    // Update customer fields
-    const updateData: any = { ...customerFields };
+    const {
+      is_active,
+      first_name,
+      last_name,
+      phone,
+      id_card,
+      nationality,
+      reward_points,
+      // id_card_img_url,      ← thêm sau AWS S3
+      // id_card_img_back_url, ← thêm sau AWS S3
+    } = updateCustomerDto;
 
     if (is_active !== undefined) {
       await this.prisma.account.update({
@@ -169,77 +123,28 @@ export class CustomersService {
 
     const updatedCustomer = await this.prisma.customer.update({
       where: { id },
-      data: updateData,
-      select: {
-        id: true,
-        first_name: true,
-        last_name: true,
-        phone: true,
-        id_card: true,
-        nationality: true,
-        reward_points: true,
-        updated_at: true,
-        account: {
-          select: {
-            id: true,
-            email: true,
-            is_active: true,
-          },
-        },
+      data: {
+        ...(first_name && { first_name }),
+        ...(last_name && { last_name }),
+        ...(phone && { phone }),
+        ...(id_card && { id_card }),
+        ...(nationality && { nationality }),
+        ...(reward_points != undefined && { reward_points }),
+        // ← Thêm sau AWS S3
+        // ...(id_card_img_url && { id_card_img_url }),
+        // ...(id_card_img_back_url && { id_card_img_back_url }),
       },
+      select: this.customerSelect(),
     });
 
-    return {
-      id: updatedCustomer.id,
-      full_name: `${updatedCustomer.last_name} ${updatedCustomer.first_name}`,
-      phone: updatedCustomer.phone,
-      id_card: updatedCustomer.id_card,
-      nationality: updatedCustomer.nationality,
-      reward_points: updatedCustomer.reward_points,
-      updated_at: updatedCustomer.updated_at,
-      account: updatedCustomer.account,
-    };
+    return this.transformCustomer(updatedCustomer);
   }
 
   async remove(id: string) {
     const customer = await this.prisma.customer.findUnique({
       where: { id },
-    });
-
-    if (!customer) {
-      throw new NotFoundException('Customer not found');
-    }
-
-    // Soft delete: chỉ vô hiệu hóa account
-    await this.prisma.account.update({
-      where: { id: customer.account_id },
-      data: { is_active: false },
-    });
-
-    return { message: 'Customer deactivated successfully' };
-  }
-
-  async getProfile(accountId: string) {
-    const customer = await this.prisma.customer.findFirst({
-      where: { account_id: accountId },
-      select: {
-        id: true,
-        first_name: true,
-        last_name: true,
-        phone: true,
-        id_card: true,
-        // id_card_img_url: true,
-        // id_card_img_back_url: true,
-        nationality: true,
-        reward_points: true,
-        updated_at: true,
-        account: {
-          select: {
-            id: true,
-            email: true,
-            is_active: true,
-          },
-        },
+      include: {
+        account: true,
       },
     });
 
@@ -247,18 +152,27 @@ export class CustomersService {
       throw new NotFoundException('Customer not found');
     }
 
-    return {
-      id: customer.id,
-      full_name: `${customer.last_name} ${customer.first_name}`,
-      phone: customer.phone,
-      id_card: customer.id_card,
-      // id_card_img_url: customer.id_card_img_url,
-      // id_card_img_back_url: customer.id_card_img_back_url,
-      nationality: customer.nationality,
-      reward_points: customer.reward_points,
-      updated_at: customer.updated_at,
-      account: customer.account,
-    };
+    if (!customer.account.is_active) {
+      throw new BadRequestException('The account has been disabled');
+    }
+
+    await this.prisma.account.update({
+      where: { id: customer.account_id },
+      data: { is_active: false },
+    });
+  }
+
+  async getProfile(accountId: string) {
+    const customer = await this.prisma.customer.findUnique({
+      where: { account_id: accountId },
+      select: this.customerSelect(),
+    });
+
+    if (!customer) {
+      throw new NotFoundException('Customer not found');
+    }
+
+    return this.transformCustomer(customer);
   }
 
   async updateProfile(
@@ -274,63 +188,57 @@ export class CustomersService {
       throw new NotFoundException('Customer not found');
     }
 
-    const { email, ...customerFields } = updateCustomerProfileDto;
+    const {
+      email,
+      first_name,
+      last_name,
+      phone,
+      id_card,
+      nationality,
+      reward_points,
+      // id_card_img_url,      ← thêm sau AWS S3
+      // id_card_img_back_url, ← thêm sau AWS S3
+    } = updateCustomerProfileDto;
 
-    // Nếu có email -> update Account
-    if (email) {
-      // Check email đã tồn tại chưa
-      const existingAccount = await this.prisma.account.findUnique({
+    if (email && email != customer.account.email) {
+      const existingEmail = await this.prisma.account.findUnique({
         where: { email },
       });
 
-      if (existingAccount && existingAccount.id !== accountId) {
+      if (existingEmail) {
         throw new BadRequestException('Email already exists');
       }
 
-      await this.prisma.account.update({
-        where: { id: accountId },
-        data: { email },
-      });
+      await this.prisma.$transaction(async (tx) => {
+        await tx.account.update({
+          where: { id: accountId },
+          data: { email },
+        });
 
-      // Update email trong customer
-      await this.prisma.customer.update({
-        where: { id: customer.id },
-        data: { email },
+        await tx.customer.update({
+          where: { id: customer.id },
+          data: { email },
+        });
       });
     }
 
     const updatedCustomer = await this.prisma.customer.update({
       where: { id: customer.id },
-      data: customerFields,
-      select: {
-        id: true,
-        first_name: true,
-        last_name: true,
-        phone: true,
-        id_card: true,
-        nationality: true,
-        reward_points: true,
-        updated_at: true,
-        account: {
-          select: {
-            id: true,
-            email: true,
-            is_active: true,
-          },
-        },
+      data: {
+        ...(first_name && { first_name }),
+        ...(last_name && { last_name }),
+        ...(phone && { phone }),
+        ...(id_card && { id_card }),
+        ...(nationality && { nationality }),
+        ...(reward_points && { reward_points }),
+        // ← Thêm sau AWS S3
+        // ...(id_card_img_url && { id_card_img_url }),
+        // ...(id_card_img_back_url && { id_card_img_back_url }),
       },
+      select: this.customerSelect(),
     });
 
-    return {
-      id: updatedCustomer.id,
-      full_name: `${updatedCustomer.last_name} ${updatedCustomer.first_name}`,
-      phone: updatedCustomer.phone,
-      id_card: updatedCustomer.id_card,
-      nationality: updatedCustomer.nationality,
-      reward_points: updatedCustomer.reward_points,
-      updated_at: updatedCustomer.updated_at,
-      account: updatedCustomer.account,
-    };
+    return this.transformCustomer(updatedCustomer);
   }
 
   async changePassword(
@@ -376,5 +284,36 @@ export class CustomersService {
     });
 
     return { message: 'Password changed successfully' };
+  }
+
+  private customerSelect() {
+    return {
+      id: true,
+      first_name: true,
+      last_name: true,
+      email: true,
+      phone: true,
+      id_card: true,
+      // id_card_img_url: true,      ← thêm sau AWS S3
+      // id_card_img_back_url: true, ← thêm sau AWS S3
+      nationality: true,
+      reward_points: true,
+      updated_at: true,
+      account: {
+        select: {
+          id: true,
+          email: true,
+          is_active: true,
+        },
+      },
+    };
+  }
+
+  private transformCustomer(customer: any) {
+    const { first_name, last_name, ...rest } = customer;
+    return {
+      ...rest,
+      full_name: `${first_name} ${last_name}`,
+    };
   }
 }
