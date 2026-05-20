@@ -2,6 +2,7 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { RoomStatus } from '@prisma/client';
 import {
   IsEnum,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -22,7 +23,11 @@ export class QueryRoomDto {
   @Min(1)
   limit?: number = 10;
 
-  @ApiPropertyOptional({ example: 'available', enum: RoomStatus })
+  @ApiPropertyOptional({
+    example: 'available',
+    enum: RoomStatus,
+    description: 'Lọc theo trạng thái (mặc định ẩn inactive)',
+  })
   @IsOptional()
   @IsEnum(RoomStatus, { message: 'Trạng thái không hợp lệ' })
   status?: RoomStatus;
@@ -43,7 +48,7 @@ export class QueryRoomDto {
     enum: ['room_number', 'floor', 'status', 'created_at'],
     description: 'Trường sắp xếp',
   })
-  @IsString()
+  @IsIn(['room_number', 'floor', 'status', 'created_at'])
   @IsOptional()
   sortBy?: string = 'room_number';
 
@@ -52,7 +57,7 @@ export class QueryRoomDto {
     enum: ['asc', 'desc'],
     description: 'Thứ tự sắp xếp',
   })
-  @IsString()
+  @IsIn(['asc', 'desc'])
   @IsOptional()
   order?: 'asc' | 'desc' = 'asc';
 

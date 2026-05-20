@@ -14,6 +14,7 @@ import {
 import { QueryRoomDto } from './dto/query-room.dto';
 import { Prisma } from '@prisma/client';
 import { Amenity } from '../room-type/dto/create-room-type.dto';
+import { UpdateRoomStatusDto } from './dto/update-room-status.dto';
 
 @Injectable()
 export class RoomService {
@@ -91,9 +92,12 @@ export class RoomService {
       floor,
       sortBy = 'room_number',
       order = 'asc',
+      search,
     } = query;
     const skip = (page - 1) * limit;
-    const where: Prisma.RoomWhereInput = {};
+    const where: Prisma.RoomWhereInput = {
+      status: { not: 'inactive' },
+    };
 
     if (status) {
       where.status = status;
@@ -120,40 +124,15 @@ export class RoomService {
     }
 
     // Search theo room_number hoặc tên room_type
-    // if (search) {
-    //   where.OR = [
-    //     { room_number: { contains: search, mode: 'insensitive' } },
-    //     { room_type: { name: { contains: search, mode: 'insensitive' } } },
-    //   ];
-    // }
+    if (search) {
+      where.OR = [{ room_number: { contains: search, mode: 'insensitive' } }];
+    }
 
     const validSortFields = ['room_number', 'floor', 'status', 'created_at'];
-
-    let orderBy: Prisma.RoomOrderByWithRelationInput = {
-      room_number: 'asc',
-    };
-
-    if (validSortFields.includes(sortBy)) {
-      orderBy = {};
-
-      switch (sortBy) {
-        case 'room_number':
-          orderBy.room_number = order;
-          break;
-
-        case 'floor':
-          orderBy.floor = order;
-          break;
-
-        case 'status':
-          orderBy.status = order;
-          break;
-
-        case 'created_at':
-          orderBy.created_at = order;
-          break;
-      }
-    }
+    const orderBy: Prisma.RoomOrderByWithRelationInput =
+      validSortFields.includes(sortBy)
+        ? { [sortBy]: order }
+        : { room_number: 'asc' };
 
     const [roomsRaw, total] = await Promise.all([
       this.prisma.room.findMany({
@@ -234,10 +213,6 @@ export class RoomService {
       throw new NotFoundException('Room does not exist');
     }
 
-    if (!room.room_type.is_active) {
-      throw new BadRequestException('Room type not active');
-    }
-
     return this.transformRoom(room);
   }
 
@@ -261,28 +236,7 @@ export class RoomService {
         ...(room_type_id && { room_type_id }),
         ...(floor != undefined && { floor }),
       },
-      select: {
-        id: true,
-        room_number: true,
-        floor: true,
-        status: true,
-        updated_at: true,
-        created_at: true,
-        // images : true,
-        room_type: {
-          select: {
-            id: true,
-            name: true,
-            base_price: true,
-            capacity: true,
-            bed_type: true,
-            amenities: true,
-            is_active: true,
-            created_at: true,
-            updated_at: true,
-          },
-        },
-      },
+      select: this.roomSelect(),
     });
 
     return this.transformRoom(updateRoom);
@@ -305,6 +259,10 @@ export class RoomService {
       throw new BadRequestException('Room already inactive');
     }
 
+    if (room.status === 'occupied') {
+      throw new BadRequestException('Không thể xóa phòng đang có khách');
+    }
+
     await this.prisma.room.update({
       where: { id },
 
@@ -312,6 +270,28 @@ export class RoomService {
         status: 'inactive',
       },
     });
+  }
+
+  private roomSelect() {
+    return {
+      id: true,
+      room_number: true,
+      floor: true,
+      status: true,
+      created_at: true,
+      updated_at: true,
+      // images: true,
+      room_type: {
+        select: {
+          id: true,
+          name: true,
+          base_price: true,
+          capacity: true,
+          bed_type: true,
+          amenities: true,
+        },
+      },
+    };
   }
 
   private transformRoom(room: any): RoomResponseDto {
@@ -343,5 +323,49 @@ export class RoomService {
     }
 
     return roomType;
+  }
+
+  available   → cleaning ✅
+available   → maintenance ✅
+available   → occupied ❌ (hệ thống tự đổi khi check-in)
+cleaning    → available ✅
+maintenance → available ✅
+occupied    → cleaning ✅ (sau check-out)
+occupied    → available ❌ (phải qua cleaning trước)
+inactive    → bất kỳ ❌ (đã xóa mềm)
+  async updateStatus(id: string, dto: UpdateRoomStatusDto) {
+    const { status: newStatus } = dto;
+    const room = await this.prisma.room.findUnique({
+      where: { id },
+      select: { id: true, status: true },
+    });
+
+    if (!room) {
+      throw new NotFoundException('Room not found');
+    }
+
+    const validTransitions: Record<string, string[]> = {
+      available: ['cleaning', 'maintenance'],
+      cleaning: ['available'],
+      maintenance: ['available'],
+      occupied: ['cleaning'],
+      inactive: [],
+    };
+
+    const allowedStatus = validTransitions[room.status] ?? [];
+
+    if (!allowedStatus.includes(newStatus)) {
+      throw new BadRequestException(
+        `Do not allow to transalte from ${room.status} to ${newStatus}`,
+      );
+    }
+
+    const updateRoom = await this.prisma.room.update({
+      where: { id },
+      data: { status: newStatus },
+      select: this.roomSelect(),
+    });
+
+    return this.transformRoom(updateRoom);
   }
 }

@@ -18,10 +18,19 @@ import {
   RoomResponseDto,
 } from './dto/room-response.dto';
 import { Roles } from '../../common/decorators/role-decorator';
-import { ApiOperation, ApiParam, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { QueryRoomDto } from './dto/query-room.dto';
+import { UpdateRoomStatusDto } from './dto/update-room-status.dto';
 
-@Controller('room')
+@Controller('rooms')
+@ApiTags('rooms')
+@ApiBearerAuth('JWT-auth')
 export class RoomController {
   constructor(private readonly roomService: RoomService) {}
 
@@ -66,6 +75,10 @@ export class RoomController {
   @Get()
   @HttpCode(200)
   @Roles('staff', 'manager', 'admin')
+  @ApiOperation({
+    summary: 'Lấy danh sách phòng',
+    description: 'Hỗ trợ filter theo trạng thái, loại phòng, tầng',
+  })
   @ApiResponse({
     status: 200,
     description: 'Trả về danh sách phòng',
@@ -81,6 +94,10 @@ export class RoomController {
   @Get(':id')
   @HttpCode(200)
   @Roles('staff', 'manager', 'admin')
+  @ApiOperation({
+    summary: 'Xem chi tiết phòng',
+    description: 'Xem thông tin chi tiết của 1 phòng',
+  })
   @ApiResponse({
     status: 200,
     description: 'Trả về chi tiết phòng',
@@ -98,9 +115,46 @@ export class RoomController {
     return this.roomService.findOne(id);
   }
 
+  @Patch(':id/status')
+  @HttpCode(200)
+  @Roles('staff', 'manager', 'admin')
+  @ApiOperation({
+    summary: 'Đổi trạng thái phòng',
+    description: `
+    Các transition hợp lệ:
+    available → cleaning, maintenance
+    cleaning → available
+    maintenance → available
+    occupied → cleaning
+  `,
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID của phòng',
+    example: 'uuid-123',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Đổi trạng thái thành công',
+    type: RoomResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Transition không hợp lệ hoặc phòng đã bị xóa',
+  })
+  @ApiResponse({ status: 401, description: 'Chưa đăng nhập' })
+  @ApiResponse({ status: 403, description: 'Không có quyền truy cập' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy phòng' })
+  async updateStatus(
+    @Param('id') id: string,
+    @Body() updateRoomStatus: UpdateRoomStatusDto,
+  ): Promise<RoomResponseDto> {
+    return this.roomService.updateStatus(id, updateRoomStatus);
+  }
+
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
-  @Roles('staff', 'manager', 'admin')
+  @Roles('manager', 'admin')
   @ApiOperation({
     summary: 'Cập nhật phòng',
   })

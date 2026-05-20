@@ -1,5 +1,5 @@
 // response-room.dto.ts
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { RoomStatus } from '@prisma/client';
 import { Amenity } from '../../room-type/dto/create-room-type.dto';
 
@@ -19,8 +19,8 @@ export class RoomTypeInRoomDto {
   @ApiProperty({ example: 'double' })
   bed_type: string;
 
-  @ApiProperty({
-    example: ['wifi', 'tv', 'air_conditioning'],
+  @ApiPropertyOptional({
+    example: ['wifi', 'tv'],
     enum: Amenity,
     isArray: true,
   })
