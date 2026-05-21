@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -11,14 +12,52 @@ import { PaginatedCustomerResponseDto } from './dto/customer-response.dto';
 import { UpdateCustomerProfileDto } from './dto/update-customer-profile.dto';
 import * as bcrypt from 'bcrypt';
 import { ChangePasswordDto } from './dto/chang-password-customer.dto';
+import { CreateGuestDto } from './dto/create-guest.dto';
+import { RegisterDTO } from '../auth/dto/register.dto';
 
 @Injectable()
 export class CustomersService {
   constructor(private prisma: PrismaService) {}
-  // create(createCustomerDto: CreateCustomerDto) {
-  //   return 'This action adds a new customer';
-  // }
+  async createGuest(dto: CreateGuestDto) {
+    const {
+      first_name,
+      last_name,
+      phone,
+      email,
+      id_card,
+      // id_card_img_back_url,
+      // id_card_img_url,
+      nationality,
+    } = dto;
 
+    // Check phone trùng
+    if (phone) {
+      const existingPhone = await this.prisma.customer.findFirst({
+        where: { phone },
+      });
+      if (existingPhone) {
+        throw new ConflictException(`Số điện thoại ${phone} đã tồn tại`);
+      }
+    }
+
+    const guest = await this.prisma.customer.create({
+      data: {
+        first_name,
+        last_name,
+        phone,
+        email,
+        id_card,
+        nationality,
+        // id_card_img_back_url,
+        // id_card_img_url,
+        source: 'walk_in', // ← khách vãng lai
+        account_id: null, // ← không có tài khoản
+      },
+      select: this.customerSelect(),
+    });
+
+    return this.transformCustomer(guest);
+  }
   async findAll(
     query: QueryCustomerDto,
   ): Promise<PaginatedCustomerResponseDto> {
@@ -29,6 +68,7 @@ export class CustomersService {
       nationality,
       orderby = 'created_at',
       order = 'desc',
+      source,
     } = query;
     const skip = (page - 1) * limit;
 
@@ -37,6 +77,12 @@ export class CustomersService {
     };
 
     if (nationality) where.nationality = nationality;
+
+    if (source) where.source = source;
+
+    // Thêm filter has_account
+    // where.account_id = { not: null }  ← chỉ lấy có tài khoản
+    // where.account_id = null           ← chỉ lấy walk-in
 
     if (search) {
       where.OR = [
@@ -284,6 +330,60 @@ export class CustomersService {
     });
 
     return { message: 'Password changed successfully' };
+  }
+
+  async linkAccount(
+    customerId: string,
+    dto: RegisterDTO,
+  ): Promise<{ message: string }> {
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+    });
+
+    if (!customer) {
+      throw new NotFoundException('Not found customer');
+    }
+
+    if (customer.account_id) {
+      throw new BadRequestException('Customer had account');
+    }
+
+    const existingAccount = await this.prisma.account.findUnique({
+      where: { email: dto.email },
+    });
+
+    if (existingAccount) {
+      throw new ConflictException('Email has been already existed');
+    }
+
+    const customerRole = await this.prisma.role.findUnique({
+      where: { name: 'customer' },
+    });
+
+    await this.prisma.$transaction(async (tx) => {
+      const hashPassword = await bcrypt.hash(dto.password, 10);
+
+      const account = await tx.account.create({
+        data: {
+          email: dto.email,
+          hash_password: hashPassword,
+          role_account: {
+            create: { role_id: customerRole.id },
+          },
+        },
+      });
+
+      // Link account vào customer
+      await tx.customer.update({
+        where: { id: customerId },
+        data: {
+          account_id: account.id,
+          registered_at: new Date(), // ← thời điểm có tài khoản
+        },
+      });
+    });
+
+    return { message: 'Link account successfully' };
   }
 
   private customerSelect() {

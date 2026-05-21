@@ -65,6 +65,8 @@ export class AuthService {
             first_name: firstName,
             last_name: lastName,
             email: account.email,
+            source: 'online_registration',
+            registered_at: new Date(),
           },
           select: {
             id: true,

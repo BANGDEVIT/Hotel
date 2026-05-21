@@ -9,6 +9,7 @@ import {
   Body,
   HttpCode,
   HttpStatus,
+  Post,
 } from '@nestjs/common';
 
 import {
@@ -29,6 +30,8 @@ import { QueryCustomerDto } from './dto/query-customers.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { UpdateCustomerProfileDto } from './dto/update-customer-profile.dto';
 import { ChangePasswordDto } from './dto/chang-password-customer.dto';
+import { CreateGuestDto } from './dto/create-guest.dto';
+import { RegisterDTO } from '../auth/dto/register.dto';
 
 @Controller('customers')
 @ApiTags('customers')
@@ -152,6 +155,27 @@ export class CustomersController {
     };
   }
 
+  // Staff tạo khách vãng lai
+  // ==================== CREATE GUEST ====================
+  @Post('guest')
+  @HttpCode(201)
+  @Roles('staff', 'manager', 'admin')
+  @ApiOperation({
+    summary: 'Tạo khách vãng lai',
+    description: 'Staff tạo hồ sơ khách walk-in tại quầy',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Tạo khách thành công',
+    type: CustomerResponseDto,
+  })
+  @ApiResponse({ status: 409, description: 'Số điện thoại đã tồn tại' })
+  async createGuest(
+    @Body() createGuestDto: CreateGuestDto,
+  ): Promise<CustomerResponseDto> {
+    return this.customerService.createGuest(createGuestDto);
+  }
+
   // ==================== GET ALL CUSTOMERS ====================
   @Get()
   @HttpCode(HttpStatus.OK)
@@ -212,6 +236,32 @@ export class CustomersController {
   })
   async findById(@Param('id') id: string): Promise<CustomerResponseDto> {
     return this.customerService.findById(id);
+  }
+
+  // Staff liên kết tài khoản cho guest
+  // ====================LINK ACCOUNT====================
+  @Post(':id/link-account')
+  @HttpCode(200)
+  @Roles('staff', 'manager', 'admin')
+  @ApiOperation({
+    summary: 'Liên kết tài khoản cho khách vãng lai',
+    description:
+      'Khi khách walk-in muốn đăng ký tài khoản — liên kết với hồ sơ cũ',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID của customer (walk-in)',
+    example: 'uuid-123',
+  })
+  @ApiResponse({ status: 200, description: 'Liên kết thành công' })
+  @ApiResponse({ status: 400, description: 'Khách hàng đã có tài khoản rồi' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy khách hàng' })
+  @ApiResponse({ status: 409, description: 'Email đã được sử dụng' })
+  async linkAccount(
+    @Param('id') customerId: string,
+    @Body() registerDto: RegisterDTO,
+  ): Promise<{ message: string }> {
+    return this.customerService.linkAccount(customerId, registerDto);
   }
 
   // ==================== UPDATE CUSTOMER ====================

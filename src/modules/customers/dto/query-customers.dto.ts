@@ -1,5 +1,13 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { CustomerSource } from '@prisma/client';
+import {
+  IsEnum,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 
 export class QueryCustomerDto {
   @ApiPropertyOptional({ example: 1 })
@@ -47,4 +55,13 @@ export class QueryCustomerDto {
   @IsOptional()
   @IsIn(['asc', 'desc'])
   order?: 'asc' | 'desc' = 'desc';
+
+  @ApiPropertyOptional({
+    example: 'walk_in',
+    enum: CustomerSource,
+    description: 'Lọc theo nguồn khách',
+  })
+  @IsOptional()
+  @IsEnum(CustomerSource)
+  source?: CustomerSource;
 }

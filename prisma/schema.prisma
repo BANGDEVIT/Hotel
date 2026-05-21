@@ -59,6 +59,11 @@ enum DayOfWeek {
   sunday
 }
 
+enum CustomerSource {
+  walk_in // khách vãng lai tại quầy
+  online_registration // đăng ký online
+}
+
 // ===== MODELS =====
 
 model Account {
@@ -87,22 +92,29 @@ model RefreshToken {
 }
 
 model Customer {
-  id                   String   @id @default(uuid()) @db.Uuid
-  account_id           String   @unique @db.Uuid
-  first_name           String   @db.VarChar
-  last_name            String   @db.VarChar
-  email                String   @db.VarChar
-  phone                String?  @db.VarChar
-  id_card              String?  @db.VarChar
+  id                   String         @id @default(uuid()) @db.Uuid
+  account_id           String?        @unique @db.Uuid
+  first_name           String         @db.VarChar
+  last_name            String         @db.VarChar
+  email                String?        @db.VarChar
+  phone                String?        @db.VarChar
+  id_card              String?        @db.VarChar
   id_card_img_url      String?
   id_card_img_back_url String?
-  nationality          String?  @db.VarChar
-  reward_points        Int      @default(0)
-  created_at           DateTime @default(now())
-  updated_at           DateTime @updatedAt
+  nationality          String?        @db.VarChar
+  reward_points        Int            @default(0)
+  source               CustomerSource @default(online_registration)
+  registered_at        DateTime? // thời điểm có tài khoản
+  created_at           DateTime       @default(now())
+  updated_at           DateTime       @updatedAt
 
-  account  Account   @relation(fields: [account_id], references: [id])
+  account  Account?  @relation(fields: [account_id], references: [id])
   bookings Booking[]
+
+  @@index([email])
+  @@index([phone])
+  @@index([source])
+  @@index([account_id])
 }
 
 model Employee {
@@ -122,7 +134,7 @@ model Employee {
   bookings              Booking[]
   employee_shifts       EmployeeShift[]
   room_status_histories RoomStatusHistory[]
-  guests                Guest[]
+  // guests                Guest[]
 }
 
 model EmployeeShift {
@@ -153,7 +165,7 @@ model Shift {
 
 model Booking {
   id               String        @id @default(uuid()) @db.Uuid
-  customer_id      String?       @db.Uuid
+  customer_id      String        @db.Uuid
   created_by       String?       @db.Uuid
   booking_type     BookingType
   check_in_date    DateTime      @db.Date
@@ -161,13 +173,13 @@ model Booking {
   actual_check_in  DateTime?
   actual_check_out DateTime?
   status           BookingStatus @default(pending)
-  guest_id         String?       @db.Uuid
+  // guest_id         String?       @db.Uuid
   created_at       DateTime      @default(now())
   updated_at       DateTime      @updatedAt
 
-  customer         Customer?        @relation(fields: [customer_id], references: [id])
+  customer         Customer         @relation(fields: [customer_id], references: [id])
   employee         Employee?        @relation(fields: [created_by], references: [id])
-  guest            Guest?           @relation(fields: [guest_id], references: [id])
+  // guest            Guest?           @relation(fields: [guest_id], references: [id])
   invoices         Invoice[]
   booking_services BookingService[]
   booking_rooms    BookingRoom[]
@@ -335,17 +347,17 @@ model Role {
   role_permissions RolePermission[]
 }
 
-model Guest {
-  id                   String   @id @default(uuid()) @db.Uuid
-  fullname             String   @db.VarChar
-  phone                String   @db.VarChar
-  email                String?  @db.VarChar // nullable
-  id_card_img_url      String
-  id_card_img_back_url String
-  create_by_staff_id   String?  @db.Uuid
-  created_at           DateTime @default(now())
-  nationality          String?  @db.VarChar
+// model Guest {
+//   id                   String   @id @default(uuid()) @db.Uuid
+//   fullname             String   @db.VarChar
+//   phone                String   @db.VarChar
+//   email                String?  @db.VarChar // nullable
+//   id_card_img_url      String
+//   id_card_img_back_url String
+//   create_by_staff_id   String?  @db.Uuid
+//   created_at           DateTime @default(now())
+//   nationality          String?  @db.VarChar
 
-  employee Employee? @relation(fields: [create_by_staff_id], references: [id])
-  bookings Booking[]
-}
+//   employee Employee? @relation(fields: [create_by_staff_id], references: [id])
+//   bookings Booking[]
+// }
