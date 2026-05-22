@@ -1,7 +1,8 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsEmail,
   IsNotEmpty,
+  IsOptional,
   IsString,
   Matches,
   MinLength,
@@ -46,7 +47,11 @@ export class RegisterDTO {
   @IsString()
   lastName: string;
 
-  // @IsNotEmpty({ message: 'Phone name is required' })
-  // @IsString()
-  // Phone: string;
+  @ApiPropertyOptional({
+    example: '0909123456',
+    description: 'Dùng để tự động link với walk-in record',
+  })
+  @IsOptional()
+  @IsString()
+  phone?: string;
 }

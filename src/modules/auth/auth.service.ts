@@ -23,7 +23,7 @@ export class AuthService {
 
   // register
   async register(registerDto: RegisterDTO): Promise<RegisterResponseDto> {
-    const { email, password, firstName, lastName } = registerDto;
+    const { email, password, firstName, lastName, phone } = registerDto;
     const exitingUser = await this.prisma.account.findUnique({
       where: { email },
     });
@@ -43,38 +43,73 @@ export class AuthService {
     try {
       const result = await this.prisma.$transaction(async (tx) => {
         const hashPassword = await bcrypt.hash(password, this.SALT_ROUNDS);
+
         const account = await tx.account.create({
           data: {
             email,
             hash_password: hashPassword,
             role_account: {
-              create: {
-                role_id: customerRole.id,
-              },
+              create: { role_id: customerRole.id },
             },
-          },
-          select: {
-            id: true,
-            email: true,
           },
         });
 
-        const customer = await tx.customer.create({
-          data: {
-            account_id: account.id,
-            first_name: firstName,
-            last_name: lastName,
-            email: account.email,
-            source: 'online_registration',
-            registered_at: new Date(),
-          },
-          select: {
-            id: true,
-            first_name: true,
-            last_name: true,
-            email: true,
-          },
-        });
+        // ← Khai báo type rõ ràng
+        const customerSelect = {
+          id: true,
+          first_name: true,
+          last_name: true,
+          email: true,
+        };
+
+        let customer: {
+          id: string;
+          first_name: string;
+          last_name: string;
+          email: string | null;
+        } | null = null;
+
+        // Check walk-in trùng SĐT
+        if (phone) {
+          const existingWalkIn = await tx.customer.findFirst({
+            where: {
+              phone,
+              account_id: null,
+              source: 'walk_in',
+            },
+            select: customerSelect,
+          });
+
+          if (existingWalkIn) {
+            // Link account vào Customer cũ
+            customer = await tx.customer.update({
+              where: { id: existingWalkIn.id },
+              data: {
+                account_id: account.id,
+                email,
+                registered_at: new Date(),
+              },
+              select: customerSelect,
+            });
+          }
+        }
+
+        // Nếu không tìm thấy walk-in → tạo Customer mới
+        if (!customer) {
+          customer = await tx.customer.create({
+            data: {
+              account_id: account.id,
+              first_name: firstName,
+              last_name: lastName,
+              email,
+              phone,
+              source: 'online_registration',
+              registered_at: new Date(),
+            },
+            select: customerSelect,
+          });
+        }
+
         return customer;
       });
 

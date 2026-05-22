@@ -64,6 +64,21 @@ enum CustomerSource {
   online_registration // đăng ký online
 }
 
+enum PaymentMethod {
+  cash
+  bank_transfer
+  e_wallet
+  credit_card
+}
+
+enum BedType {
+  single // 1 giường đơn
+  double // 1 giường đôi
+  twin // 2 giường đơn
+  king // 1 giường king
+  queen // 1 giường queen
+}
+
 // ===== MODELS =====
 
 model Account {
@@ -130,10 +145,10 @@ model Employee {
   position   String   @db.VarChar
   gender     String   @db.VarChar
 
-  account               Account             @relation(fields: [account_id], references: [id])
-  bookings              Booking[]
-  employee_shifts       EmployeeShift[]
-  room_status_histories RoomStatusHistory[]
+  account         Account         @relation(fields: [account_id], references: [id])
+  bookings        Booking[]
+  employee_shifts EmployeeShift[]
+  // room_status_histories RoomStatusHistory[]
   // guests                Guest[]
 }
 
@@ -206,13 +221,13 @@ model Invoice {
 }
 
 model Payment {
-  id               String   @id @default(uuid()) @db.Uuid
-  invoice_id       String   @db.Uuid
+  id               String        @id @default(uuid()) @db.Uuid
+  invoice_id       String        @db.Uuid
   amount           Decimal
-  paid_at          DateTime @default(now())
-  reference_number String?  @db.VarChar // nullable — tiền mặt không có mã GD
-  payment_method   String   @db.VarChar
-  created_at       DateTime @default(now())
+  paid_at          DateTime      @default(now())
+  reference_number String?       @db.VarChar // nullable — tiền mặt không có mã GD
+  payment_method   PaymentMethod
+  created_at       DateTime      @default(now())
 
   invoice Invoice @relation(fields: [invoice_id], references: [id])
 
@@ -220,21 +235,25 @@ model Payment {
 }
 
 model Service {
-  id        String  @id @default(uuid()) @db.Uuid
-  name      String  @db.VarChar
-  price     Decimal
-  is_active Boolean @default(true)
+  id         String   @id @default(uuid()) @db.Uuid
+  name       String   @db.VarChar
+  price      Decimal
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 
   booking_services BookingService[]
 }
 
 model BookingService {
-  id          String  @id @default(uuid()) @db.Uuid
-  service_id  String  @db.Uuid
-  booking_id  String  @db.Uuid
+  id          String   @id @default(uuid()) @db.Uuid
+  service_id  String   @db.Uuid
+  booking_id  String   @db.Uuid
   quantity    Int
   unit_price  Decimal
   total_price Decimal // non-nullable — luôn = quantity * unit_price
+  used_at     DateTime @default(now()) // ← thêm — thời điểm dùng dịch vụ
+  note        String? // ← thêm — ghi chú
 
   service Service @relation(fields: [service_id], references: [id])
   booking Booking @relation(fields: [booking_id], references: [id])
@@ -251,6 +270,7 @@ model BookingRoom {
   booking Booking @relation(fields: [booking_id], references: [id])
   room    Room    @relation(fields: [room_id], references: [id])
 
+  @@unique([booking_id, room_id])
   @@index([room_id])
   @@index([booking_id])
 }
@@ -271,14 +291,6 @@ model Room {
 
   @@index([status]) // filter phòng available
   @@index([room_type_id]) // filter phòng theo loại
-}
-
-enum BedType {
-  single // 1 giường đơn
-  double // 1 giường đôi
-  twin // 2 giường đơn
-  king // 1 giường king
-  queen // 1 giường queen
 }
 
 model RoomType {
@@ -307,8 +319,8 @@ model RoomStatusHistory {
   account Account? @relation(fields: [changed_by], references: [id])
 
   // employee Employee? @relation(fields: [changed_by], references: [id])
-  employee   Employee? @relation(fields: [employeeId], references: [id])
-  employeeId String?   @db.Uuid
+  // employee   Employee? @relation(fields: [employeeId], references: [id])
+  // employeeId String?   @db.Uuid
 
   @@index([room_id]) // lấy lịch sử của phòng
 }
